@@ -1,4 +1,4 @@
-name: dunedaq-develop CI
+name: dunedaq-develop CI for C++
 
 on:
   push:
