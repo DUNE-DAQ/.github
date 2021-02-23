@@ -1,0 +1,17 @@
+{
+    "name": "dunedaq-develop CI",
+    "description": "DUNE DAQ Develop branch CI workflow.",
+    "iconName": "icon",
+    "categories": [
+        "c++"
+    ],
+    "filePatterns": [
+        "*.h$",
+        "*.c$",
+        "*.hpp$",
+        "*.cpp$",
+        "*.jsonnet$",
+        "*.schema$",
+        ".*\\.md$"
+    ]
+}
