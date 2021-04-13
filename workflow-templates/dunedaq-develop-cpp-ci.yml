@@ -56,7 +56,7 @@ jobs:
         repository: DUNE-DAQ/daq-release
         path: daq-release
         
-    - name: setup dev area
+    - name: setup dev area and checkout code
       run: |
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
           export DBT_ROOT=$GITHUB_WORKSPACE/daq-buildtools
@@ -65,12 +65,11 @@ jobs:
           dbt-create.sh -r /releases dunedaq-develop dev
           cd dev
           cp $GITHUB_WORKSPACE/daq-release/configs/dunedaq-develop/release_manifest.sh .
+          export BR="develop"
+          [[ -z ${!GITHUB_SHA+x} ]] || export BR=$GITHUB_SHA
+          $GITHUB_WORKSPACE/daq-release/scripts/checkout-package.sh -f ./release_manifest.sh -p $REPO -b ${BR} -o sourcecode
           
-    - name: checkout package for CI
-      uses: actions/checkout@v2
-      with:
-        path: ${{ github.repository }}
-    
+
     - name: setup build env and build the dev release
       run: |
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
@@ -107,3 +106,4 @@ jobs:
       with:
         name: build_log
         path: ${{ github.workspace }}/dev/log
+        
