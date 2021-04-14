@@ -1,7 +1,6 @@
 name: build-develop
 
-# Controls when the action will run. Workflow runs when manually triggered using the UI
-# or API.
+# Controls when the action will run.
 on:
   push:
     branches: [ $default-branch ]
@@ -13,21 +12,9 @@ on:
     - cron: "0 7 * * *"
 
   workflow_dispatch:
-    # Inputs the workflow accepts.
-    inputs:
-      name:
-        # Friendly description to be shown in the UI instead of 'name'
-        description: 'Manual start the CI workflow'
-        # Default value if no value is explicitly provided
-        default: 'Yes'
-        # Input has to be provided for the workflow to run
-        required: true
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This workflow contains a single job called "greet"
   Build_against_dev_release:
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
     container:
       image: dunedaq/sl7-minimal:dev
@@ -37,13 +24,7 @@ jobs:
     env:
       DBT_AREA_FILE: "dbt-settings"
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Runs a single command using the runners shell
-    
-    - name: Start the CI
-      run: echo "Start the CI anyway ${{ github.event.inputs.name }}"
-
     - name: Checkout daq-buildtools
       uses: actions/checkout@v2
       with:
