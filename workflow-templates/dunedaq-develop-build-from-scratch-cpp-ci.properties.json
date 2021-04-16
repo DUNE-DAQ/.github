@@ -1,0 +1,17 @@
+{
+    "name": "Rebuild dunedaq-develop from scratch",
+    "description": "Build the package together with the develop HEAD of all other DAQ packages.",
+    "iconName": "cpp-icon",
+    "categories": [
+        "C++"
+    ],
+    "filePatterns": [
+        "*.h$",
+        "*.c$",
+        "*.hpp$",
+        "*.cpp$",
+        "*.jsonnet$",
+        "*.schema$",
+        ".*\\.md$"
+    ]
+}
