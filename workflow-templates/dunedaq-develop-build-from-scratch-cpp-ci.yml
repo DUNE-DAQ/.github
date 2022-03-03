@@ -34,13 +34,13 @@ jobs:
     
 
     - name: Checkout daq-buildtools
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: DUNE-DAQ/daq-buildtools
         path: daq-buildtools
 
     - name: Checkout daq-release
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: DUNE-DAQ/daq-release
         path: daq-release
@@ -54,7 +54,7 @@ jobs:
           $GITHUB_WORKSPACE/daq-release/scripts/checkout-package.sh -f ./release_manifest.sh -a -b develop -o sourcecode
           
     - name: checkout package for CI
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         path: ${{ github.repository }}
     
