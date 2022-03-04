@@ -87,7 +87,7 @@ jobs:
           dbt-build.py --unittest
           echo "------------------------------------------------------------------------"
           echo "-------------------------- Unit Test Summary ---------------------------"
-          cat log/unittest*/unit_test_summary.log
+          cat log/unit_tests*/unit_test_summary.log || true
           
           
     - name: upload UPS tarball and log file
@@ -112,4 +112,4 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: linting_log_${{ matrix.os_name }}
-        path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/unittest*
+        path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/unit_tests*
