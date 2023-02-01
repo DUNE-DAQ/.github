@@ -27,7 +27,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - image: "ghcr.io/dune-daq/c7-slim-externals:spack-dev"
+          - image: "ghcr.io/dune-daq/sl7-slim-externals:spack-dev"
             os_name: "c7"
           - image: "ghcr.io/dune-daq/c8-slim-externals:spack-dev"
             os_name: "c8"
