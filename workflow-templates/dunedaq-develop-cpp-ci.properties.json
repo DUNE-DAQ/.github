@@ -1,6 +1,6 @@
 {
-    "name": "dunedaq-develop CI for C++",
-    "description": "DUNE DAQ Develop branch CI workflow.",
+    "name": "dunedaq-develop CI for FarDet C++ packages",
+    "description": "DUNE DAQ Develop branch CI workflow for FarDet C++ packages.",
     "iconName": "cpp-icon",
     "categories": [
         "C++"
