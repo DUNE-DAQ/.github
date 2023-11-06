@@ -1,0 +1,17 @@
+{
+    "name": "Build then run integration test with cvmfs on host",
+    "description": "DUNE DAQ Develop branch CI workflow.",
+    "iconName": "cpp-icon",
+    "categories": [
+        "C++"
+    ],
+    "filePatterns": [
+        "*.h$",
+        "*.c$",
+        "*.hpp$",
+        "*.cpp$",
+        "*.jsonnet$",
+        "*.schema$",
+        ".*\\.md$"
+    ]
+}
