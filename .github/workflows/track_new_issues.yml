@@ -2,6 +2,9 @@ name: Run "Add issue to project"
 
 on:
   workflow_call: 
+    secrets:
+      BOT_CI_ISSUES:
+        required: true
 
 jobs:
   track_issue:
