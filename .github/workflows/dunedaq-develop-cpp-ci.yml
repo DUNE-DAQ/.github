@@ -67,6 +67,7 @@ jobs:
           dbt-workarea-env
 
           #cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}/sourcecode
+          export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
           ../daq-release/scripts/clone_all_packages_with_branch.py --branch ${{ inputs.caller_branch }} --package-group coredaq
           ../daq-release/scripts/clone_all_packages_with_branch.py --branch ${{ inputs.caller_branch }} --package-group fddaq
 
