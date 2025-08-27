@@ -49,10 +49,13 @@ jobs:
     
     - name: setup build env, build the repo against the development release
       run: |
+          echo "Caller branch was ${{ inputs.source_branch }}"
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
           cd $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}
           source env.sh
           test $REPO == "dbe" && spack load dbe
+          dbt-workarea-env
+
           cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}/sourcecode
           dbt-build  # --unittest done elsewhere; --lint unavailable due to llvm being too large for images
 
@@ -61,15 +64,3 @@ jobs:
       with:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
-
-    # - name: upload linter output file
-    #   uses: actions/upload-artifact@v4
-    #   with:
-    #     name: linting_log_${{ matrix.os_name }}
-    #     path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/linting*
-
-    # - name: upload unittest output file
-    #   uses: actions/upload-artifact@v4
-    #   with:
-    #     name: unit_tests_log_${{ matrix.os_name }}
-    #     path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/unit_tests*
