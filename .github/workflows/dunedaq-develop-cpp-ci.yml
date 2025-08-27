@@ -4,6 +4,12 @@ name: build-develop
 # or API.
 on:
   workflow_call:
+    inputs:
+      caller_branch:
+        description: 'The branch on which the calling workflow resides'
+        default: 'ignored'
+        required: false
+        type: string
 
 jobs:
   Build_against_dev_release:
@@ -49,7 +55,7 @@ jobs:
     
     - name: setup build env, build the repo against the development release
       run: |
-          echo "Caller branch was ${{ inputs.source_branch }}"
+          echo "Caller branch was ${{ inputs.caller_branch }}"
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
           cd $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}
           source env.sh
