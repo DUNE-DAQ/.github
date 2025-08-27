@@ -70,6 +70,7 @@ jobs:
           ./scripts/clone_all_packages_with_branch.py --branch XXXXXX --package-group coredaq
           ./scripts/clone_all_packages_with_branch.py --branch XXXXXX --package-group fddaq
 
+          dbt-info sourcecode
           dbt-build  # --unittest done elsewhere; --lint unavailable due to llvm being too large for images
 
     - name: upload build log file
