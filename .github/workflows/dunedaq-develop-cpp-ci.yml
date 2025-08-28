@@ -64,7 +64,7 @@ jobs:
           dbt-workarea-env
           cd $DBT_AREA_ROOT/sourcecode
 
-          if [[ "$BRANCH" = "ignored" || "$BRANCH" = "johnfreeman/sandbox_target" ]; then
+          if [[ "$BRANCH" == "ignored" || "$BRANCH" == "johnfreeman/sandbox_target" ]]; then
             cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO .
           else
             export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
