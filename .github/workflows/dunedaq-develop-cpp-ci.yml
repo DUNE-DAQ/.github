@@ -65,11 +65,12 @@ jobs:
           source env.sh
           test $REPO == "dbe" && spack load dbe
           dbt-workarea-env
+          cd $DBT_AREA_ROOT/sourcecode
 
           #cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}/sourcecode
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-          ../daq-release/scripts/clone_all_packages_with_branch.py --branch ${{ inputs.caller_branch }} --package-group coredaq
-          ../daq-release/scripts/clone_all_packages_with_branch.py --branch ${{ inputs.caller_branch }} --package-group fddaq
+          ../../daq-release/scripts/clone_all_packages_with_branch.py --branch ${{ inputs.caller_branch }} --package-group coredaq
+          ../../daq-release/scripts/clone_all_packages_with_branch.py --branch ${{ inputs.caller_branch }} --package-group fddaq
 
           dbt-info sourcecode
           dbt-build  # --unittest done elsewhere; --lint unavailable due to llvm being too large for images
