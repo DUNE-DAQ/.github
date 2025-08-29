@@ -17,14 +17,28 @@ on:
         type: string
 
 jobs:
+  Determine_image:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.set_image.outputs.image }}
+    steps:
+      - id: set_image
+        run: |
+          if [[ "${{ inputs.target_branch }}" =~ ^johnfreeman/.*2 ]]; then
+            echo "image=ghcr.io/dune-daq/candidate-release-alma9:latest" >> $GITHUB_OUTPUT
+          else
+            echo "image=ghcr.io/dune-daq/nightly-release-alma9:development_v5" >> $GITHUB_OUTPUT
+          fi
+
   Build_against_dev_release:
+    needs: Determine_image
     name: build_against_dev_on_${{ matrix.os_name }}
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - image: "ghcr.io/dune-daq/nightly-release-alma9:development_v5"
+          - image: ${{ needs.determine_image.outputs.image }}
             os_name: "a9"
     container:
       image: ${{ matrix.image }}
