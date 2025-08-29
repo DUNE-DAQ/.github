@@ -10,6 +10,11 @@ on:
         default: 'ignored'
         required: false
         type: string
+      target_branch:
+        description: 'The branch which determines which release to build against'
+        default: 'ignored'
+        required: false
+        type: string
 
 jobs:
   Build_against_dev_release:
@@ -39,6 +44,8 @@ jobs:
         
     - name: setup dev area
       run: |
+          echo "Caller branch is " "${{ inputs.caller_branch }}"
+          echo "Target branch is " "${{ inputs.target_branch }}"
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
           source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
           setup_dbt latest_v5 || true
