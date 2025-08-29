@@ -62,12 +62,15 @@ jobs:
           echo "Target branch is " "${{ inputs.target_branch }}"
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
           source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
-          setup_dbt latest_v5 || true
-          release_name="last_fddaq"
+          setup_dbt latest
 
-          if [[ -n $( sed -r -n '/- name: '$REPO'$/p' daq-release/configs/nddaq/nddaq-develop/release.yaml ) ]] ; then release_name="last_nddaq"; fi
-
-          dbt-create -n $release_name dev-${{ matrix.os_name }}
+          if [[ ${{ needs.determine_image.outputs.image }} =~ ^.*candidate.* ]]; then
+            release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/candidates/ | grep fddaq )
+            dbt-create -b candidate $release_name dev-${{ matrix.os_name }}
+          else
+            release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/nightly/ | grep fddaq )
+            dbt-create -n $release_name dev-${{ matrix.os_name }}
+          fi
 
     - name: checkout package for CI
       uses: actions/checkout@v4
