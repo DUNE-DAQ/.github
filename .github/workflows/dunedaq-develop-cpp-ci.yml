@@ -26,6 +26,8 @@ jobs:
         run: |
           if [[ "${{ inputs.target_branch }}" =~ ^johnfreeman/.*2 ]]; then
             echo "image=ghcr.io/dune-daq/candidate-release-alma9:latest" >> $GITHUB_OUTPUT
+          elif [[ "${{ inputs.target_branch }}" =~ ^johnfreeman/.*3 ]]; then
+            echo "image=ghcr.io/dune-daq/stable-release-alma9:latest" >> $GITHUB_OUTPUT
           else
             echo "image=ghcr.io/dune-daq/nightly-release-alma9:development_v5" >> $GITHUB_OUTPUT
           fi
@@ -64,11 +66,14 @@ jobs:
           source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
           setup_dbt latest
 
-          if [[ ${{ needs.determine_image.outputs.image }} =~ ^.*candidate.* ]]; then
-            release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/candidates/ | grep fddaq )
+          if [[ ${{ needs.determine_image.outputs.image }} =~ ^.*stable.* ]]; then
+            release_name=$( ls -tr /cvmfs/dunedaq.opensciencegrid.org/spack/releases/ | grep fddaq | tail -1 )
+            dbt-create $release_name dev-${{ matrix.os_name }}
+          elif [[ ${{ needs.determine_image.outputs.image }} =~ ^.*candidate.* ]]; then
+            release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/candidates/ | grep fddaq | tail -1 )
             dbt-create -b candidate $release_name dev-${{ matrix.os_name }}
           else
-            release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/nightly/ | grep fddaq )
+            release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/nightly/ | grep fddaq | tail -1 )
             dbt-create -n $release_name dev-${{ matrix.os_name }}
           fi
 
@@ -88,9 +93,9 @@ jobs:
           dbt-workarea-env
           cd $DBT_AREA_ROOT/sourcecode
 
-          if [[ "$BRANCH" == "ignored" || "$BRANCH" == "johnfreeman/sandbox_target" ]]; then
+          if [[ "${{ inputs.caller_branch }}" == "${{ inputs.target_branch }}" ]]; then
             cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO .
-          else
+          else   # Someone opened a PR
             export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
             ../../daq-release/scripts/clone_all_packages_with_branch.py --branch ${{ inputs.caller_branch }} --package-group coredaq
             ../../daq-release/scripts/clone_all_packages_with_branch.py --branch ${{ inputs.caller_branch }} --package-group fddaq
