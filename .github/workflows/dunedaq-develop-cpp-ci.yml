@@ -4,17 +4,10 @@ name: build-develop
 # or API.
 on:
   workflow_call:
-    inputs:
-      caller_branch:
-        description: 'The branch on which the calling workflow resides'
-        default: 'ignored'
-        required: false
-        type: string
-      target_branch:
-        description: 'The branch which determines which release to build against'
-        default: 'ignored'
-        required: false
-        type: string
+
+env:
+  CALLER_BRANCH: ${{ github.head_ref || github.ref_name }}
+  TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
 
 jobs:
   Determine_image:
@@ -24,9 +17,9 @@ jobs:
     steps:
       - id: set_image
         run: |
-          if [[ "${{ inputs.target_branch }}" =~ ^johnfreeman/.*2 ]]; then
+          if [[ "$TARGET_BRANCH" =~ ^johnfreeman/.*2 ]]; then
             echo "image=ghcr.io/dune-daq/candidate-release-alma9:latest" >> $GITHUB_OUTPUT
-          elif [[ "${{ inputs.target_branch }}" =~ ^johnfreeman/.*3 ]]; then
+          elif [[ "$TARGET_BRANCH" =~ ^johnfreeman/.*3 ]]; then
             echo "image=ghcr.io/dune-daq/stable-release-alma9:latest" >> $GITHUB_OUTPUT
           else
             echo "image=ghcr.io/dune-daq/nightly-release-alma9:development_v5" >> $GITHUB_OUTPUT
@@ -60,8 +53,8 @@ jobs:
         
     - name: setup dev area
       run: |
-          echo "Caller branch is " "${{ inputs.caller_branch }}"
-          echo "Target branch is " "${{ inputs.target_branch }}"
+          echo "Caller branch is " "$CALLER_BRANCH"
+          echo "Target branch is " "$TARGET_BRANCH"
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
           source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
           setup_dbt latest
@@ -84,7 +77,7 @@ jobs:
     
     - name: setup build env, build the repo against the development release
       run: |
-          BRANCH="${{ inputs.caller_branch }}"
+          BRANCH="$CALLER_BRANCH"
 
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
           cd $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}
@@ -93,12 +86,12 @@ jobs:
           dbt-workarea-env
           cd $DBT_AREA_ROOT/sourcecode
 
-          if [[ "${{ inputs.caller_branch }}" == "${{ inputs.target_branch }}" ]]; then
+          if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
             cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO .
           else   # Someone opened a PR
             export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-            ../../daq-release/scripts/clone_all_packages_with_branch.py --branch ${{ inputs.caller_branch }} --package-group coredaq
-            ../../daq-release/scripts/clone_all_packages_with_branch.py --branch ${{ inputs.caller_branch }} --package-group fddaq
+            ../../daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group coredaq
+            ../../daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group fddaq
           fi
 
           dbt-info sourcecode
