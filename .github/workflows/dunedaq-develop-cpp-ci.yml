@@ -17,9 +17,9 @@ jobs:
     steps:
       - id: set_image
         run: |
-          if [[ "$TARGET_BRANCH" =~ ^johnfreeman/.*2 ]]; then
+          if [[ "$TARGET_BRANCH" =~ ^prep-release/.* ]]; then
             echo "image=ghcr.io/dune-daq/candidate-release-alma9:latest" >> $GITHUB_OUTPUT
-          elif [[ "$TARGET_BRANCH" =~ ^johnfreeman/.*3 ]]; then
+          elif [[ "$TARGET_BRANCH" =~ ^patch/.* ]]; then
             echo "image=ghcr.io/dune-daq/stable-release-alma9:latest" >> $GITHUB_OUTPUT
           else
             echo "image=ghcr.io/dune-daq/nightly-release-alma9:development_v5" >> $GITHUB_OUTPUT
