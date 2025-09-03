@@ -5,15 +5,35 @@ name: build-develop
 on:
   workflow_call:
 
+env:
+  CALLER_BRANCH: ${{ github.head_ref || github.ref_name }}
+  TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
+
 jobs:
+  Determine_image:
+    runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.set_image.outputs.image }}
+    steps:
+      - id: set_image
+        run: |
+          if [[ "$TARGET_BRANCH" =~ ^prep-release/.* ]]; then
+            echo "image=ghcr.io/dune-daq/candidate-release-alma9:latest" >> $GITHUB_OUTPUT
+          elif [[ "$TARGET_BRANCH" =~ ^patch/.* ]]; then
+            echo "image=ghcr.io/dune-daq/stable-release-alma9:latest" >> $GITHUB_OUTPUT
+          else
+            echo "image=ghcr.io/dune-daq/nightly-release-alma9:development_v5" >> $GITHUB_OUTPUT
+          fi
+
   Build_against_dev_release:
+    needs: Determine_image
     name: build_against_dev_on_${{ matrix.os_name }}
     # The type of runner that the job will run on
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - image: "ghcr.io/dune-daq/nightly-release-alma9:development_v5"
+          - image: ${{ needs.determine_image.outputs.image }}
             os_name: "a9"
     container:
       image: ${{ matrix.image }}
@@ -33,14 +53,22 @@ jobs:
         
     - name: setup dev area
       run: |
+          echo "Caller branch is " "$CALLER_BRANCH"
+          echo "Target branch is " "$TARGET_BRANCH"
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
           source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
-          setup_dbt latest_v5 || true
-          release_name="last_fddaq"
+          setup_dbt latest
 
-          if [[ -n $( sed -r -n '/- name: '$REPO'$/p' daq-release/configs/nddaq/nddaq-develop/release.yaml ) ]] ; then release_name="last_nddaq"; fi
-
-          dbt-create -n $release_name dev-${{ matrix.os_name }}
+          if [[ ${{ needs.determine_image.outputs.image }} =~ ^.*stable.* ]]; then
+            release_name=$( ls -tr /cvmfs/dunedaq.opensciencegrid.org/spack/releases/ | grep fddaq | tail -1 )
+            dbt-create $release_name dev-${{ matrix.os_name }}
+          elif [[ ${{ needs.determine_image.outputs.image }} =~ ^.*candidate.* ]]; then
+            release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/candidates/ | grep fddaq | tail -1 )
+            dbt-create -b candidate $release_name dev-${{ matrix.os_name }}
+          else
+            release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/nightly/ | grep fddaq | tail -1 )
+            dbt-create -n $release_name dev-${{ matrix.os_name }}
+          fi
 
     - name: checkout package for CI
       uses: actions/checkout@v4
@@ -49,11 +77,24 @@ jobs:
     
     - name: setup build env, build the repo against the development release
       run: |
+          BRANCH="$CALLER_BRANCH"
+
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
           cd $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}
           source env.sh
           test $REPO == "dbe" && spack load dbe
-          cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}/sourcecode
+          dbt-workarea-env
+          cd $DBT_AREA_ROOT/sourcecode
+
+          if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
+            cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO .
+          else   # Someone opened a PR
+            export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            ../../daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group coredaq
+            ../../daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group fddaq
+          fi
+
+          dbt-info sourcecode
           dbt-build  # --unittest done elsewhere; --lint unavailable due to llvm being too large for images
 
     - name: upload build log file
@@ -61,15 +102,3 @@ jobs:
       with:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
-
-    # - name: upload linter output file
-    #   uses: actions/upload-artifact@v4
-    #   with:
-    #     name: linting_log_${{ matrix.os_name }}
-    #     path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/linting*
-
-    # - name: upload unittest output file
-    #   uses: actions/upload-artifact@v4
-    #   with:
-    #     name: unit_tests_log_${{ matrix.os_name }}
-    #     path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/unit_tests*
