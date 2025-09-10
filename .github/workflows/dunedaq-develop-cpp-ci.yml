@@ -46,7 +46,7 @@ jobs:
     # Runs a single command using the runners shell
     
     - name: Checkout daq-release
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         repository: DUNE-DAQ/daq-release
         path: daq-release
@@ -71,7 +71,7 @@ jobs:
           fi
 
     - name: checkout package for CI
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         path: ${{ github.repository }}
     
