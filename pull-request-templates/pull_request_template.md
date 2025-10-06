@@ -31,8 +31,8 @@ _Comments here on the testing_
 
 ## Further checks
 
-- [ ] Code is commented, particularly in hard-to-understand areas
+- [ ] Code is commented where needed, particularly in hard-to-understand areas
 - [ ] Code style is correct (`dbt-build --lint`, and/or see https://dune-daq-sw.readthedocs.io/en/latest/packages/styleguide/)
-- [ ] Tests added or an issue has been opened to tackle that in the future.
+- [ ] If applicable, new tests have been added or an issue has been opened to tackle that in the future.
   (Indicate issue here: # (issue))
 
