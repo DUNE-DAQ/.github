@@ -15,19 +15,32 @@ jobs:
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
     steps:
+
+      - name: checkout package for CI
+        uses: actions/checkout@v5
+        with:
+          path: ${{ github.repository }}
+
       - id: check
         run: |
-          if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
-
-            git remote show origin
-            git branch
-            git log -1
-            git log -1 --format=%ct
-            echo "should_run=false" >> $GITHUB_OUTPUT
-            echo "This appears to be triggered by a merge; single repo CI is effectively disabled"
-            exit 0
-          else
+          if [[ "$CALLER_BRANCH" != "$TARGET_BRANCH" ]]; then
             echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+
+            cd $GITHUB_WORKSPACE/${{ github.repository }}
+            git checkout $TARGET_BRANCH
+            commit_time=$( git log -1 --format=%ct )
+            current_time=$( date +%s )
+
+            max_time_since_push=90
+
+            if (( $(( current_time - commit_time )) > $max_time_since_push )); then
+              echo "should_run=true" >> $GITHUB_OUTPUT
+            else
+              echo "should_run=false" >> $GITHUB_OUTPUT
+              echo "This appears to be triggered by a merge or a push; single repo CI is disabled for this case"
+              exit 0
+            fi
           fi
 
   Determine_image:
@@ -63,9 +76,7 @@ jobs:
       run:
         shell: bash
 
-    # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
-    # Runs a single command using the runners shell
     
     - name: Checkout daq-release
       uses: actions/checkout@v5
@@ -92,11 +103,6 @@ jobs:
             dbt-create -n $release_name dev-${{ matrix.os_name }}
           fi
 
-    - name: checkout package for CI
-      uses: actions/checkout@v5
-      with:
-        path: ${{ github.repository }}
-    
     - name: setup build env, build the repo against the development release
       run: |
           BRANCH="$CALLER_BRANCH"
