@@ -18,6 +18,11 @@ jobs:
       - id: check
         run: |
           if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
+
+            git remote show origin
+            git branch
+            git log -1
+            git log -1 --format=%ct
             echo "should_run=false" >> $GITHUB_OUTPUT
             echo "This appears to be triggered by a merge; single repo CI is effectively disabled"
             exit 0
