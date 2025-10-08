@@ -32,13 +32,14 @@ jobs:
             commit_time=$( git log -1 --format=%ct )
             current_time=$( date +%s )
 
+            time_since_last_commit=$(( current_time - commit_time ))
             max_time_since_push=90
 
-            if (( $(( current_time - commit_time )) > $max_time_since_push )); then
+            if (( $time_since_last_commit > $max_time_since_push )); then
               echo "should_run=true" >> $GITHUB_OUTPUT
             else
               echo "should_run=false" >> $GITHUB_OUTPUT
-              echo "This appears to be triggered by a merge or a push; single repo CI is disabled for this case"
+              echo "Single repo CI will not proceed as this appears to be triggered by a merge or a push (last commit to $TARGET_BRANCH was $time_since_last_commit seconds ago)"
               exit 0
             fi
           fi
@@ -102,6 +103,11 @@ jobs:
             release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/nightly/ | grep fddaq | tail -1 )
             dbt-create -n $release_name dev-${{ matrix.os_name }}
           fi
+
+    - name: checkout package for CI
+      uses: actions/checkout@v5
+      with:
+        path: ${{ github.repository }}
 
     - name: setup build env, build the repo against the development release
       run: |
