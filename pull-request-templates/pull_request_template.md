@@ -1,6 +1,6 @@
 # Description
 
-_If full decription and testing details are included on a parent issue, please link to that here._
+_If full description and testing details are included on a parent issue, please link to that here._
 See issue # for details
 
 _Otherwise, please include a summary of the change and which issue is fixed (if any).
