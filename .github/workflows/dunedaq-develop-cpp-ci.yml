@@ -17,7 +17,7 @@ jobs:
     steps:
 
       - name: checkout package for CI
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           path: ${{ github.repository }}
 
@@ -80,7 +80,7 @@ jobs:
     steps:
     
     - name: Checkout daq-release
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         repository: DUNE-DAQ/daq-release
         path: daq-release
@@ -105,7 +105,7 @@ jobs:
           fi
 
     - name: checkout package for CI
-      uses: actions/checkout@v5
+      uses: actions/checkout@v6
       with:
         path: ${{ github.repository }}
 
