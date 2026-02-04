@@ -115,9 +115,7 @@ jobs:
 
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
           cd $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}
-          source env.sh
-          test $REPO == "dbe" && spack load dbe
-          dbt-workarea-env
+
           cd $DBT_AREA_ROOT/sourcecode
 
           if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
@@ -128,6 +126,13 @@ jobs:
             ../../daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group fddaq
           fi
 
+          . ./env.sh
+
+          if [[ -d "./dbe" ]]; then
+            spack load dbe
+          fi
+
+          dbt-workarea-env
           dbt-info sourcecode
           dbt-build  # --unittest done elsewhere; --lint unavailable due to llvm being too large for images
 
