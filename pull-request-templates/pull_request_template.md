@@ -23,7 +23,7 @@ _Please also include instructions for how a reviewer can test your changes._
 
 - [ ] Unit tests pass (e.g. `dbt-build --unittest`)
 - [ ] Minimal system quicktest passes (`pytest -s minimal_system_quick_test.py`)
-- [ ] Full set of integration tests pass (`daqsystemtest_integtest_bundle.sh`)
+- [ ] Full set of integration tests pass (`dunedaq_integtest_bundle.sh`)
 - [ ] Python tests pass if applicable (e.g. `python -m pytest`)
 - [ ] Pre-commit hooks run successfully if applicable (e.g. `pre-commit run --all-files`)
 
