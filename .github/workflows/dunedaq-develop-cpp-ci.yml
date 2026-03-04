@@ -17,7 +17,7 @@ jobs:
     steps:
 
       - name: checkout package for CI
-        uses: actions/checkout@v6
+        uses: actions/checkout@main
         with:
           path: ${{ github.repository }}
 
@@ -80,7 +80,7 @@ jobs:
     steps:
     
     - name: Checkout daq-release
-      uses: actions/checkout@v6
+      uses: actions/checkout@main
       with:
         repository: DUNE-DAQ/daq-release
         path: daq-release
@@ -105,7 +105,7 @@ jobs:
           fi
 
     - name: checkout package for CI
-      uses: actions/checkout@v6
+      uses: actions/checkout@main
       with:
         path: ${{ github.repository }}
 
@@ -136,7 +136,7 @@ jobs:
           dbt-build  # --unittest done elsewhere; --lint unavailable due to llvm being too large for images
 
     - name: upload build log file
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@main
       with:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
