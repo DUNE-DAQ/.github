@@ -120,7 +120,9 @@ jobs:
           BRANCH="$CALLER_BRANCH"
 
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
-          cd $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}
+          #cd $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}
+
+          echo "Before script: $(pwd)"
 
           cat << EOF > build_and_lint_package.sh
           #!/bin/bash
@@ -128,11 +130,14 @@ jobs:
           source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
           setup_dbt latest
 
+          echo "Creating in container: $(pwd)"
           dbt-create ${{ steps.setup_dev_area.outputs.extra_dbt_args }} \
                      ${{ steps.setup_dev_area.outputs.release_name}} \
                      dev-${{ matrix.os_name }}
 
+          echo "Build area?: $(ls)"
           cd dev-${{ matrix.os_name }}
+          echo "Now in: $(pwd)"
           source env.sh
 
           cd sourcecode
