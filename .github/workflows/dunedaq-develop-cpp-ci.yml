@@ -168,7 +168,7 @@ jobs:
             -v "${GITHUB_WORKSPACE}:/ghw" \
             -w /ghw \
             ${{ needs.determine_image.outputs.image }} \
-            /ghw/dev-${{ matrix.os_name }}/build_and_lint_package.sh
+            /ghw/build_and_lint_package.sh
 
     - name: upload build log file
       uses: actions/upload-artifact@main
