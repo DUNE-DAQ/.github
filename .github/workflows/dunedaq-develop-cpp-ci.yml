@@ -170,8 +170,20 @@ jobs:
             ${{ needs.determine_image.outputs.image }} \
             /ghw/build_and_lint_package.sh
 
+          echo "Post-container: where am I? $(pwd)"
+          echo "Post-container: what's here? $(ls -l)"
+
+          echo "Linting results?"
+          ls dev-${{ matrix.os_name }}/log/linting*/*_linting.log
+
     - name: upload build log file
       uses: actions/upload-artifact@main
       with:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
+
+    - name: upload linting log file
+      uses: actions/upload-artifact@main
+      with:
+        name: linting_results
+        path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/linting*/_linting.log
