@@ -143,12 +143,15 @@ jobs:
 
           chmod +x build_and_lint_package.sh
 
+          echo "Where am I? $(pwd)"
+          echo "What's here? $(ls -l)"
+
           docker run --rm \
             -v /cvmfs:/cvmfs:shared \
             -v "${GITHUB_WORKSPACE}:/ghw" \
             -w /ghw \
             ${{ needs.determine_image.outputs.image }} \
-            ./build_and_lint_package.sh
+            /ghw/dev-${{ matrix.os_name }}/build_and_lint_package.sh
 
     - name: upload build log file
       uses: actions/upload-artifact@main
