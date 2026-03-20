@@ -2,6 +2,11 @@ name: Single-Package CI Build
 
 on:
   workflow_call:
+    inputs:
+      caller_event_name:
+        required: true
+        type: string
+        description: "Flag to distinguish between e.g. schedule and pull request"
 
 env:
   CALLER_BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -87,7 +92,7 @@ jobs:
     - name: Pull build image
       run: docker pull ${{ needs.determine_image.outputs.image }}
         
-    - id: setup_dev_area
+    - id: get_release_info
       run: |
           echo "Caller branch is " "$CALLER_BRANCH"
           echo "Target branch is " "$TARGET_BRANCH"
@@ -96,15 +101,12 @@ jobs:
           extra_dbt_args=""
           if [[ ${{ needs.determine_image.outputs.image }} =~ ^.*stable.* ]]; then
             release_name=$( ls -tr /cvmfs/dunedaq.opensciencegrid.org/spack/releases/ | grep fddaq | tail -1 )
-            #dbt-create $release_name dev-${{ matrix.os_name }}
           elif [[ ${{ needs.determine_image.outputs.image }} =~ ^.*candidate.* ]]; then
             extra_dbt_args="-b candidate"
             release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/candidates/ | grep fddaq | tail -1 )
-            #dbt-create -b candidate $release_name dev-${{ matrix.os_name }}
           else
             extra_dbt_args="-n"
             release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/nightly/ | grep fddaq | tail -1 )
-            #dbt-create -n $release_name dev-${{ matrix.os_name }}
           fi
 
           echo "extra_dbt_args=$extra_dbt_args" >> "$GITHUB_OUTPUT"
@@ -131,8 +133,8 @@ jobs:
           setup_dbt latest
 
           echo "Creating in container: $(pwd)"
-          dbt-create ${{ steps.setup_dev_area.outputs.extra_dbt_args }} \
-                     ${{ steps.setup_dev_area.outputs.release_name}} \
+          dbt-create ${{ steps.get_release_info.outputs.extra_dbt_args }} \
+                     ${{ steps.get_release_info.outputs.release_name}} \
                      dev-${{ matrix.os_name }}
 
           echo "Build area?: $(ls)"
@@ -160,9 +162,6 @@ jobs:
 
           chmod +x build_and_lint_package.sh
 
-          echo "Where am I? $(pwd)"
-          echo "What's here? $(ls -l)"
-
           docker run --rm \
             -v /cvmfs:/cvmfs:shared \
             -v "${GITHUB_WORKSPACE}:/ghw" \
@@ -170,40 +169,81 @@ jobs:
             ${{ needs.determine_image.outputs.image }} \
             /ghw/build_and_lint_package.sh
 
-          echo "Post-container: where am I? $(pwd)"
-          echo "Post-container: what's here? $(ls -l)"
-
-          echo "Linting results?"
-          ls dev-${{ matrix.os_name }}/log/linting*/*_linting.log
-
     - name: upload build log file
       uses: actions/upload-artifact@main
       with:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
 
+    - name: set linting artifact name
+      id: set_artifact_name
+      run: |
+        linting_artifact_name="linting_results"
+        if [[ ${{ inputs.caller_event_name == 'schedule' }} ]]; then
+          linting_artifact_name="nightly_linting_results"
+        fi
+        echo "linting_artifact_name=$linting_artifact_name" >> "$GITHUB_OUTPUT"
+
     - name: upload linting log file
       uses: actions/upload-artifact@main
       with:
-        name: linting_results
+        name: ${{ steps.set_artifact_name.outputs.linting_artifact_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/linting*/*_linting.log
+  
+  compare_linting_results:
+    if: ${{ inputs.caller_event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
 
-    - name: Download nightly linting results
-      if: ${{ github.event_name == 'pull_request' }}
+    steps:
+    - name: Get ID of latest nightly run
+      id: latest_nightly
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        run_id=$(gh run list \
+          --repo ${{ github.repository }}
+          --workflow dunedaq-develop-cpp-ci.yml \
+          --event schedule \
+          --limit 1 \
+          --json databaseId \
+          --jq '.[0].databaseId')
+
+        echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+    - name: Download latest nightly linting results
       uses: actions/download-artifact@main
       with:
-        name: linting_results
-        path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/nightly_linting_results.log 
+        name: nightly_linting_results
+        run-id: ${{ steps.latest_nightly.outputs.run_id }}
 
-    - name: Compare to nightly linting results
-      if: ${{ github.event_name == 'pull_request' }}
+    - name: Download pull request linting results
+      uses: actions/download-artifact@main
+      with:
+        name: pull_request_linting_results
+
+    - name: Compare linting results
+      id: compare
+      continue-on-error: true
       run: |
+        diff_file_name=linting_diff.txt
         pr_linting_results_file=$(dev-${{ matrix.os_name }}/log/linting*/*_linting.log)
         nightly_linting_results_file=$(dev-${{ matrix.os_name }}/nightly_linting_results.log)
+
         [[ -f "$pr_linting_results_file" ]] || echo "ERROR: No PR results file; exit 1"
         [[ -f "$nightly_linting_results_file" ]] || echo "ERROR: No nightly results file; exit 2"
-        if ! diff "$pr_linting_results_file" "$nightly_linting_results_file" > linting_diff.txt; then
+
+        if ! diff "$pr_linting_results_file" "$nightly_linting_results_file" > "$diff_file_name"; then
           echo "ERROR: This PR introduces new linting errors:"
-          cat linting_diff.txt
+          cat "$diff_file_name"
+          echo "diff_file_name=$diff_file_name" >> "$GITHUB_OUTPUT"
           exit 1
         fi
+
+    - name: upload linting diff file
+      uses: actions/upload-artifact@main
+      with:
+        name: linting_diff
+        path: ${{ github.workspace }}/${{ steps.compare.outputs.diff_file_name }}
