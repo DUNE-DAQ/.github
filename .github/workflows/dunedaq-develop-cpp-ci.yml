@@ -192,6 +192,7 @@ jobs:
   
   compare_linting_results:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
+    needs: Build_against_dev_release
     runs-on: ubuntu-latest
     defaults:
       run:
