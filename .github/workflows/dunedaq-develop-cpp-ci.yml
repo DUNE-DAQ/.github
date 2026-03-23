@@ -178,7 +178,7 @@ jobs:
     - name: set linting artifact name
       id: set_artifact_name
       run: |
-        linting_artifact_name="linting_results"
+        linting_artifact_name="pull_request_linting_results"
         if [[ ${{ inputs.caller_event_name == 'schedule' }} ]]; then
           linting_artifact_name="nightly_linting_results"
         fi
@@ -243,7 +243,8 @@ jobs:
         fi
 
     - name: upload linting diff file
+      if: steps.compare.outputs.diff_file_name
       uses: actions/upload-artifact@main
       with:
         name: linting_diff
-        path: ${{ github.workspace }}/${{ steps.compare.outputs.diff_file_name }}
+        path: ${{ steps.compare.outputs.diff_file_name }}
