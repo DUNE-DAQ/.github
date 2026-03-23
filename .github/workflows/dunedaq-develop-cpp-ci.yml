@@ -175,6 +175,10 @@ jobs:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
 
+    - name: Troubleshoot event name
+      run: |
+        echo "Event name = ${{ inputs.caller_event_name }}"
+
     - name: set linting artifact name
       id: set_artifact_name
       run: |
