@@ -183,9 +183,10 @@ jobs:
       id: set_artifact_name
       run: |
         linting_artifact_name="pull_request_linting_results"
-        if [[ ${{ inputs.caller_event_name == 'schedule' }} ]]; then
+        if [[ "${{ inputs.caller_event_name }}" == "schedule" ]]; then
           linting_artifact_name="nightly_linting_results"
         fi
+        echo "linting_artifact_name=$linting_artifact_name"
         echo "linting_artifact_name=$linting_artifact_name" >> "$GITHUB_OUTPUT"
 
     - name: upload linting log file
