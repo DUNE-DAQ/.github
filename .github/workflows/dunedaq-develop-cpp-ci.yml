@@ -1,5 +1,8 @@
 name: Single-Package CI Build
 
+permissions:
+  contents: read
+
 on:
   workflow_call:
     inputs:
