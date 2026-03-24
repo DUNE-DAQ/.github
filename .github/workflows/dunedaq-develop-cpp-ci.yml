@@ -227,9 +227,17 @@ jobs:
 
         echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
 
+    - name: List artifacts on the target run
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        gh api repos/DUNE-DAQ/hdf5libs/actions/runs/${{ steps.latest_nightly.outputs.run_id }}/artifacts \
+          --jq '.artifacts[] | [.name, .expired, .size_in_bytes] | @tsv'
+
     - name: Download latest nightly linting results
       uses: actions/download-artifact@main
       with:
+        github-token: ${{ github.token }}
         name: nightly_linting_results
         run-id: ${{ steps.latest_nightly.outputs.run_id }}
 
