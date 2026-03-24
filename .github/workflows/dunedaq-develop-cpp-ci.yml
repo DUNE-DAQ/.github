@@ -209,13 +209,18 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        run_id=$(gh run list \
-          --repo ${{ github.repository }} \
-          --workflow dunedaq-develop-cpp-ci.yml \
-          --event schedule \
-          --limit 1 \
-          --json databaseId \
-          --jq '.[0].databaseId')
+        #run_id=$(gh run list \
+        #  --repo ${{ github.repository }} \
+        #  --workflow dunedaq-develop-cpp-ci.yml \
+        #  --event schedule \
+        #  --limit 1 \
+        #  --json databaseId \
+        #  --jq '.[0].databaseId')
+
+        # TODO: Hard-coding alert to a fake scheduled run with linting results
+        # Longer term, the nightly linting should upload linting results and the
+        # above expression should work
+        run_id=23493490741
 
         echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
 
