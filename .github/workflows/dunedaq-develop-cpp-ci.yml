@@ -246,13 +246,23 @@ jobs:
       with:
         name: pull_request_linting_results
 
+    - name: List contents
+      run: |
+        echo "Where am I?"
+        pwd
+        echo "What's here?"
+        ls -lrt
+
     - name: Compare linting results
       id: compare
       continue-on-error: true
       run: |
         diff_file_name=linting_diff.txt
-        pr_linting_results_file=$(dev-${{ matrix.os_name }}/log/linting*/*_linting.log)
-        nightly_linting_results_file=$(dev-${{ matrix.os_name }}/nightly_linting_results.log)
+        pr_linting_results_file=$(find . -name *_linting.log)
+        nightly_linting_results_file=$(find . -name nightly_linting_results.log)
+
+        echo "pr_linting_results_file=$pr_linting_results"
+        echo "nightly_linting_results_file=$nightly_linting_results"
 
         [[ -f "$pr_linting_results_file" ]] || echo "ERROR: No PR results file; exit 1"
         [[ -f "$nightly_linting_results_file" ]] || echo "ERROR: No nightly results file; exit 2"
