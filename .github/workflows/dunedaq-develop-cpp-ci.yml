@@ -220,7 +220,7 @@ jobs:
         # TODO: Hard-coding alert to a fake scheduled run with linting results
         # Longer term, the nightly linting should upload linting results and the
         # above expression should work
-        run_id=23493490741
+        run_id=23444192414
 
         echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
 
