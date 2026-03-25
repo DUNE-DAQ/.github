@@ -279,8 +279,8 @@ jobs:
         [[ -f "$pr_linting_results_file" ]] || echo "ERROR: No PR results file; exit 1"
         [[ -f "$nightly_linting_results_file" ]] || echo "ERROR: No nightly results file; exit 2"
 
-        nightly_norm = $(mktemp)
-        pr_norm = $(mktemp)
+        nightly_norm=$(mktemp)
+        pr_norm=$(mktemp)
 
         normalize_lint "$nightly_linting_results" > "$nightly_norm"
         normalize_lint "$pr_linting_results" > "$pr_norm"
