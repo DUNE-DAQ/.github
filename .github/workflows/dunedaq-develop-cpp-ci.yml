@@ -257,8 +257,18 @@ jobs:
 
     - name: Compare linting results
       id: compare
-      continue-on-error: true
       run: |
+        normalize_lint() {
+          sed -E '
+            s#^/[^ ]*/(sourcecode/.*)#\1#;     # drop leading absolute path before sourcecode/
+            s#:[0-9]+:[0-9]+:#:#g;             # drop :line:col:
+            s#:[0-9]+:#:#g;                    # drop :line:
+            /^Total errors found:/d;           # drop summary
+          ' "$1" |
+          grep -E '\[[^][]+\]' |               # keep only lines with a [check]
+          sort -u
+        }
+
         diff_file_name=linting_diff.txt
         pr_linting_results_file=$(find pull_request_linting/ -name "*_linting.log" | tail -n 1)
         nightly_linting_results_file=$(find nightly_linting/ -name "*_linting.log" | tail -n 1)
@@ -269,15 +279,26 @@ jobs:
         [[ -f "$pr_linting_results_file" ]] || echo "ERROR: No PR results file; exit 1"
         [[ -f "$nightly_linting_results_file" ]] || echo "ERROR: No nightly results file; exit 2"
 
-        if ! diff "$pr_linting_results_file" "$nightly_linting_results_file" > "$diff_file_name"; then
+        nightly_norm = $(mktemp)
+        pr_norm = $(mktemp)
+
+        normalize_lint "$nightly_linting_results" > "$nightly_norm"
+        normalize_lint "$pr_linting_results" > "$pr_norm"
+
+        comm -13 "$nightly_norm" "$pr_norm" > "$diff_file_name"
+
+        if [[ -s "$diff_file_name" ]]; then
           echo "ERROR: This PR introduces new linting errors:"
           cat "$diff_file_name"
+          echo "diff_exists=true" >> "$GITHUB_OUTPUT"
           echo "diff_file_name=$diff_file_name" >> "$GITHUB_OUTPUT"
           exit 1
+        else
+          diff_exists="false"
         fi
 
     - name: upload linting diff file
-      if: steps.compare.outputs.diff_file_name
+      if: ${{ always() && steps.compare.outputs.diff_exists == 'true' }}
       uses: actions/upload-artifact@main
       with:
         name: linting_diff
