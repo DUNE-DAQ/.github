@@ -263,6 +263,7 @@ jobs:
             s#^/[^ ]*/(sourcecode/.*)#\1#;     # drop leading absolute path before sourcecode/
             s#:[0-9]+:[0-9]+:#:#g;             # drop :line:col:
             s#:[0-9]+:#:#g;                    # drop :line:
+            /^[ ]*[0-9]+[ ]\|/d;               # Remove lines starting with " line | "
             /^Total errors found:/d;           # drop summary
           ' "$1" |
           grep -E '\[[^][]+\]' |               # keep only lines with a [check]
