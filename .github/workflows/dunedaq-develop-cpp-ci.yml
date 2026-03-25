@@ -282,8 +282,8 @@ jobs:
         nightly_norm=$(mktemp)
         pr_norm=$(mktemp)
 
-        normalize_lint "$nightly_linting_results" > "$nightly_norm"
-        normalize_lint "$pr_linting_results" > "$pr_norm"
+        normalize_lint "$nightly_linting_results_file" > "$nightly_norm"
+        normalize_lint "$pr_linting_results_file" > "$pr_norm"
 
         comm -13 "$nightly_norm" "$pr_norm" > "$diff_file_name"
 
