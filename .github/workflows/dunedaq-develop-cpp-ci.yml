@@ -1,4 +1,4 @@
-name: Single-Package CI Build
+name: Single-Package CI Build and Linting
 
 permissions:
   contents: read
@@ -81,7 +81,6 @@ jobs:
         shell: bash
 
     steps:
-    
     - name: Checkout daq-release
       uses: actions/checkout@main
       with:
@@ -99,7 +98,6 @@ jobs:
       run: |
           echo "Caller branch is " "$CALLER_BRANCH"
           echo "Target branch is " "$TARGET_BRANCH"
-          export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
 
           extra_dbt_args=""
           if [[ ${{ needs.determine_image.outputs.image }} =~ ^.*stable.* ]]; then
@@ -125,9 +123,6 @@ jobs:
           BRANCH="$CALLER_BRANCH"
 
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
-          #cd $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}
-
-          echo "Before script: $(pwd)"
 
           cat << EOF > build_and_lint_package.sh
           #!/bin/bash
@@ -135,14 +130,10 @@ jobs:
           source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
           setup_dbt latest
 
-          echo "Creating in container: $(pwd)"
           dbt-create ${{ steps.get_release_info.outputs.extra_dbt_args }} \
                      ${{ steps.get_release_info.outputs.release_name}} \
                      dev-${{ matrix.os_name }}
-
-          echo "Build area?: $(ls)"
           cd dev-${{ matrix.os_name }}
-          echo "Now in: $(pwd)"
           source env.sh
 
           cd sourcecode
@@ -178,10 +169,6 @@ jobs:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
 
-    - name: Troubleshoot event name
-      run: |
-        echo "Event name = ${{ inputs.caller_event_name }}"
-
     - name: set linting artifact name
       id: set_artifact_name
       run: |
@@ -189,7 +176,6 @@ jobs:
         if [[ "${{ inputs.caller_event_name }}" == "schedule" ]]; then
           linting_artifact_name="nightly_linting_results"
         fi
-        echo "linting_artifact_name=$linting_artifact_name"
         echo "linting_artifact_name=$linting_artifact_name" >> "$GITHUB_OUTPUT"
 
     - name: upload linting log file
@@ -212,27 +198,18 @@ jobs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
-        #run_id=$(gh run list \
-        #  --repo ${{ github.repository }} \
-        #  --workflow dunedaq-develop-cpp-ci.yml \
-        #  --event schedule \
-        #  --limit 1 \
-        #  --json databaseId \
-        #  --jq '.[0].databaseId')
+        run_id=$(gh run list \
+          --repo ${{ github.repository }} \
+          --workflow dunedaq-develop-cpp-ci.yml \
+          --event schedule \
+          --limit 1 \
+          --json databaseId \
+          --jq '.[0].databaseId')
 
-        # TODO: Hard-coding alert to a fake scheduled run with linting results
-        # Longer term, the nightly linting should upload linting results and the
-        # above expression should work
+        # TODO: Remove hard-coding before merge
         run_id=23444192414
 
         echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
-
-    - name: List artifacts on the target run
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        gh api repos/DUNE-DAQ/hdf5libs/actions/runs/${{ steps.latest_nightly.outputs.run_id }}/artifacts \
-          --jq '.artifacts[] | [.name, .expired, .size_in_bytes] | @tsv'
 
     - name: Download latest nightly linting results
       uses: actions/download-artifact@main
@@ -247,13 +224,6 @@ jobs:
       with:
         name: pull_request_linting_results
         path: pull_request_linting
-
-    - name: List contents
-      run: |
-        echo "Where am I?"
-        pwd
-        echo "What's here?"
-        ls -lrt
 
     - name: Compare linting results
       id: compare
@@ -273,9 +243,6 @@ jobs:
         diff_file_name=linting_diff.txt
         pr_linting_results_file=$(find pull_request_linting/ -name "*_linting.log" | tail -n 1)
         nightly_linting_results_file=$(find nightly_linting/ -name "*_linting.log" | tail -n 1)
-
-        echo "pr_linting_results_file=$pr_linting_results"
-        echo "nightly_linting_results_file=$nightly_linting_results"
 
         [[ -f "$pr_linting_results_file" ]] || echo "ERROR: No PR results file; exit 1"
         [[ -f "$nightly_linting_results_file" ]] || echo "ERROR: No nightly results file; exit 2"
@@ -299,7 +266,7 @@ jobs:
         fi
 
     - name: upload linting diff file
-      if: ${{ always() && steps.compare.outputs.diff_exists == 'true' }}
+      if: ${{ steps.compare.outputs.diff_exists == 'true' }}
       uses: actions/upload-artifact@main
       with:
         name: linting_diff
