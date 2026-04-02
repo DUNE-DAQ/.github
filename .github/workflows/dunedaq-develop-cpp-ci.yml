@@ -4,6 +4,13 @@ permissions:
   contents: read
 
 on:
+  workflow_dispatch:
+    inputs:
+      caller_event_name:
+        default: 'schedule'
+        type: string
+        description: "Enter 'pull_request' (without quotes) to compare results to latest nightly linting results."
+
   workflow_call:
     inputs:
       caller_event_name:
