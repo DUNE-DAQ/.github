@@ -206,9 +206,7 @@ jobs:
           --json databaseId \
           --jq '.[0].databaseId')
 
-        # TODO: Remove hard-coding before merge
-        run_id=23444192414
-
+        echo "Comparing results to those from run_id=$run_id"
         echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
 
     - name: Download latest nightly linting results
