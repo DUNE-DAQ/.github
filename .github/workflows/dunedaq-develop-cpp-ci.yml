@@ -1,9 +1,15 @@
-name: build-develop
+name: Single-Package CI Build and Linting
 
-# Controls when the action will run. Workflow runs when manually triggered using the UI
-# or API.
+permissions:
+  contents: read
+
 on:
   workflow_call:
+    inputs:
+      caller_event_name:
+        required: true
+        type: string
+        description: "Flag to distinguish between e.g. schedule and pull request"
 
 env:
   CALLER_BRANCH: ${{ github.head_ref || github.ref_name }}
@@ -64,45 +70,48 @@ jobs:
   Build_against_dev_release:
     needs: Determine_image
     name: build_against_dev_on_${{ matrix.os_name }}
-    # The type of runner that the job will run on
     runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
           - image: ${{ needs.determine_image.outputs.image }}
             os_name: "a9"
-    container:
-      image: ${{ matrix.image }}
     defaults:
       run:
         shell: bash
 
     steps:
-    
     - name: Checkout daq-release
       uses: actions/checkout@main
       with:
         repository: DUNE-DAQ/daq-release
         path: daq-release
+
+    - uses: cvmfs-contrib/github-action-cvmfs@v5
+      with:
+        cvmfs_repositories: 'dunedaq-development.opensciencegrid.org'
+
+    - name: Pull build image
+      run: docker pull ${{ needs.determine_image.outputs.image }}
         
-    - name: setup dev area
+    - id: get_release_info
       run: |
           echo "Caller branch is " "$CALLER_BRANCH"
           echo "Target branch is " "$TARGET_BRANCH"
-          export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
-          source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
-          setup_dbt latest
 
+          extra_dbt_args=""
           if [[ ${{ needs.determine_image.outputs.image }} =~ ^.*stable.* ]]; then
             release_name=$( ls -tr /cvmfs/dunedaq.opensciencegrid.org/spack/releases/ | grep fddaq | tail -1 )
-            dbt-create $release_name dev-${{ matrix.os_name }}
           elif [[ ${{ needs.determine_image.outputs.image }} =~ ^.*candidate.* ]]; then
+            extra_dbt_args="-b candidate"
             release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/candidates/ | grep fddaq | tail -1 )
-            dbt-create -b candidate $release_name dev-${{ matrix.os_name }}
           else
+            extra_dbt_args="-n"
             release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/nightly/ | grep fddaq | tail -1 )
-            dbt-create -n $release_name dev-${{ matrix.os_name }}
           fi
+
+          echo "extra_dbt_args=$extra_dbt_args" >> "$GITHUB_OUTPUT"
+          echo "release_name=$release_name"     >> "$GITHUB_OUTPUT"
 
     - name: checkout package for CI
       uses: actions/checkout@main
@@ -114,17 +123,26 @@ jobs:
           BRANCH="$CALLER_BRANCH"
 
           export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
-          cd $GITHUB_WORKSPACE/dev-${{ matrix.os_name }}
 
-          . ./env.sh
-          cd $DBT_AREA_ROOT/sourcecode
+          cat << EOF > build_and_lint_package.sh
+          #!/bin/bash
 
+          source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
+          setup_dbt latest
+
+          dbt-create ${{ steps.get_release_info.outputs.extra_dbt_args }} \
+                     ${{ steps.get_release_info.outputs.release_name}} \
+                     dev-${{ matrix.os_name }}
+          cd dev-${{ matrix.os_name }}
+          source env.sh
+
+          cd sourcecode
           if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
-            cp -pr $GITHUB_WORKSPACE/DUNE-DAQ/$REPO .
+            cp -pr /ghw/DUNE-DAQ/$REPO .
           else   # Someone opened a PR
             export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-            ../../daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group coredaq
-            ../../daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group fddaq
+            /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group coredaq
+            /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group fddaq
           fi
 
           if [[ -d "./dbe" ]]; then
@@ -133,10 +151,121 @@ jobs:
 
           dbt-workarea-env
           dbt-info sourcecode
-          dbt-build  # --unittest done elsewhere; --lint unavailable due to llvm being too large for images
+          dbt-build --lint
+          EOF
+
+          chmod +x build_and_lint_package.sh
+
+          docker run --rm \
+            -v /cvmfs:/cvmfs:shared \
+            -v "${GITHUB_WORKSPACE}:/ghw" \
+            -w /ghw \
+            ${{ needs.determine_image.outputs.image }} \
+            /ghw/build_and_lint_package.sh
 
     - name: upload build log file
       uses: actions/upload-artifact@main
       with:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
+
+    - name: set linting artifact name
+      id: set_artifact_name
+      run: |
+        linting_artifact_name="pull_request_linting_results"
+        if [[ "${{ inputs.caller_event_name }}" == "schedule" ]]; then
+          linting_artifact_name="nightly_linting_results"
+        fi
+        echo "linting_artifact_name=$linting_artifact_name" >> "$GITHUB_OUTPUT"
+
+    - name: upload linting log file
+      uses: actions/upload-artifact@main
+      with:
+        name: ${{ steps.set_artifact_name.outputs.linting_artifact_name }}
+        path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/linting*/*_linting.log
+  
+  compare_linting_results:
+    if: ${{ inputs.caller_event_name == 'pull_request' }}
+    needs: Build_against_dev_release
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    - name: Get ID of latest nightly run
+      id: latest_nightly
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        run_id=$(gh run list \
+          --repo ${{ github.repository }} \
+          --workflow dunedaq-develop-cpp-ci.yml \
+          --event schedule \
+          --limit 1 \
+          --json databaseId \
+          --jq '.[0].databaseId')
+
+        echo "Comparing results to those from run_id=$run_id"
+        echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+
+    - name: Download latest nightly linting results
+      uses: actions/download-artifact@main
+      with:
+        github-token: ${{ github.token }}
+        name: nightly_linting_results
+        path: nightly_linting
+        run-id: ${{ steps.latest_nightly.outputs.run_id }}
+
+    - name: Download pull request linting results
+      uses: actions/download-artifact@main
+      with:
+        name: pull_request_linting_results
+        path: pull_request_linting
+
+    - name: Compare linting results
+      id: compare
+      run: |
+        normalize_lint() {
+          sed -E '
+            s#^/[^ ]*/(sourcecode/.*)#\1#;     # drop leading absolute path before sourcecode/
+            s#:[0-9]+:[0-9]+:#:#g;             # drop :line:col:
+            s#:[0-9]+:#:#g;                    # drop :line:
+            /^[ ]*[0-9]+[ ]\|/d;               # Remove lines starting with " line | "
+            /^Total errors found:/d;           # drop summary
+          ' "$1" |
+          grep -E '\[[^][]+\]' |               # keep only lines with a [check]
+          sort -u
+        }
+
+        diff_file_name=linting_diff.txt
+        pr_linting_results_file=$(find pull_request_linting/ -name "*_linting.log" | tail -n 1)
+        nightly_linting_results_file=$(find nightly_linting/ -name "*_linting.log" | tail -n 1)
+
+        [[ -f "$pr_linting_results_file" ]] || echo "ERROR: No PR results file; exit 1"
+        [[ -f "$nightly_linting_results_file" ]] || echo "ERROR: No nightly results file; exit 2"
+
+        nightly_norm=$(mktemp)
+        pr_norm=$(mktemp)
+
+        normalize_lint "$nightly_linting_results_file" > "$nightly_norm"
+        normalize_lint "$pr_linting_results_file" > "$pr_norm"
+
+        comm -13 "$nightly_norm" "$pr_norm" > "$diff_file_name"
+
+        if [[ -s "$diff_file_name" ]]; then
+          echo "ERROR: This PR introduces new linting errors:"
+          cat "$diff_file_name"
+          echo "diff_exists=true" >> "$GITHUB_OUTPUT"
+          echo "diff_file_name=$diff_file_name" >> "$GITHUB_OUTPUT"
+          exit 1
+        else
+          diff_exists="false"
+        fi
+
+    - name: upload linting diff file
+      if: ${{ steps.compare.outputs.diff_exists == 'true' }}
+      uses: actions/upload-artifact@main
+      with:
+        name: linting_diff
+        path: ${{ steps.compare.outputs.diff_file_name }}
