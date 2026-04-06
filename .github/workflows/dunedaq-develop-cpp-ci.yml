@@ -23,7 +23,7 @@ jobs:
     steps:
 
       - name: checkout package for CI
-        uses: actions/checkout@main
+        uses: actions/checkout@v6
         with:
           path: ${{ github.repository }}
 
@@ -82,12 +82,12 @@ jobs:
 
     steps:
     - name: Checkout daq-release
-      uses: actions/checkout@main
+      uses: actions/checkout@v6
       with:
         repository: DUNE-DAQ/daq-release
         path: daq-release
 
-    - uses: cvmfs-contrib/github-action-cvmfs@v5
+    - uses: cvmfs-contrib/github-action-cvmfs@v5.5
       with:
         cvmfs_repositories: 'dunedaq-development.opensciencegrid.org'
 
@@ -114,7 +114,7 @@ jobs:
           echo "release_name=$release_name"     >> "$GITHUB_OUTPUT"
 
     - name: checkout package for CI
-      uses: actions/checkout@main
+      uses: actions/checkout@v6
       with:
         path: ${{ github.repository }}
 
@@ -164,7 +164,7 @@ jobs:
             /ghw/build_and_lint_package.sh
 
     - name: upload build log file
-      uses: actions/upload-artifact@main
+      uses: actions/upload-artifact@v7
       with:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
@@ -179,7 +179,7 @@ jobs:
         echo "linting_artifact_name=$linting_artifact_name" >> "$GITHUB_OUTPUT"
 
     - name: upload linting log file
-      uses: actions/upload-artifact@main
+      uses: actions/upload-artifact@v7
       with:
         name: ${{ steps.set_artifact_name.outputs.linting_artifact_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/linting*/*_linting.log
@@ -210,7 +210,7 @@ jobs:
         echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
 
     - name: Download latest nightly linting results
-      uses: actions/download-artifact@main
+      uses: actions/download-artifact@v8
       with:
         github-token: ${{ github.token }}
         name: nightly_linting_results
@@ -218,7 +218,7 @@ jobs:
         run-id: ${{ steps.latest_nightly.outputs.run_id }}
 
     - name: Download pull request linting results
-      uses: actions/download-artifact@main
+      uses: actions/download-artifact@v8
       with:
         name: pull_request_linting_results
         path: pull_request_linting
@@ -265,7 +265,7 @@ jobs:
 
     - name: upload linting diff file
       if: ${{ steps.compare.outputs.diff_exists == 'true' }}
-      uses: actions/upload-artifact@main
+      uses: actions/upload-artifact@v7
       with:
         name: linting_diff
         path: ${{ steps.compare.outputs.diff_file_name }}
