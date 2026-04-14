@@ -14,6 +14,7 @@ on:
 env:
   CALLER_BRANCH: ${{ github.head_ref || github.ref_name }}
   TARGET_BRANCH: ${{ github.base_ref || github.ref_name }}
+  REPO: ${{ github.event.repository.name }}
 
 jobs:
   Should_run:
@@ -71,8 +72,6 @@ jobs:
     needs: Determine_image
     name: build_against_dev_on_${{ matrix.os_name }}
     runs-on: ubuntu-latest
-    env:
-      REPO: ${{ github.event.repository.name }}
     strategy:
       matrix:
         include:
@@ -188,8 +187,6 @@ jobs:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
     needs: Build_against_dev_release
     runs-on: ubuntu-latest
-    env:
-      REPO: ${{ github.event.repository.name }}
     defaults:
       run:
         shell: bash
