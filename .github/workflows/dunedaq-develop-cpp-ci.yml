@@ -71,6 +71,8 @@ jobs:
     needs: Determine_image
     name: build_against_dev_on_${{ matrix.os_name }}
     runs-on: ubuntu-latest
+    env:
+      REPO: ${{ github.event.repository.name }}
     strategy:
       matrix:
         include:
@@ -121,8 +123,6 @@ jobs:
     - name: setup build env, build the repo against the development release
       run: |
           BRANCH="$CALLER_BRANCH"
-
-          export REPO=$(echo '${{ github.repository }}' | awk -F '/' '{print $2}')
 
           cat << EOF > build_and_lint_package.sh
           #!/bin/bash
@@ -188,6 +188,8 @@ jobs:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
     needs: Build_against_dev_release
     runs-on: ubuntu-latest
+    env:
+      REPO: ${{ github.event.repository.name }}
     defaults:
       run:
         shell: bash
@@ -239,8 +241,8 @@ jobs:
         }
 
         diff_file_name=linting_diff.txt
-        pr_linting_results_file=$(find pull_request_linting/ -name "*_linting.log" | tail -n 1)
-        nightly_linting_results_file=$(find nightly_linting/ -name "*_linting.log" | tail -n 1)
+        pr_linting_results_file=$(find pull_request_linting/ -name "$REPO_linting.log" | tail -n 1)
+        nightly_linting_results_file=$(find nightly_linting/ -name "$REPO_linting.log" | tail -n 1)
 
         [[ -f "$pr_linting_results_file" ]] || echo "ERROR: No PR results file; exit 1"
         [[ -f "$nightly_linting_results_file" ]] || echo "ERROR: No nightly results file; exit 2"
