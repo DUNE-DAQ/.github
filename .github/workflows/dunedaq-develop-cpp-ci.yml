@@ -241,8 +241,8 @@ jobs:
         }
 
         diff_file_name=linting_diff.txt
-        pr_linting_results_file=$(find pull_request_linting/ -name "$REPO_linting.log" | tail -n 1)
-        nightly_linting_results_file=$(find nightly_linting/ -name "$REPO_linting.log" | tail -n 1)
+        pr_linting_results_file=$(find pull_request_linting/ -name "${REPO}_linting.log" | tail -n 1)
+        nightly_linting_results_file=$(find nightly_linting/ -name "${REPO}_linting.log" | tail -n 1)
 
         [[ -f "$pr_linting_results_file" ]] || echo "ERROR: No PR results file; exit 1"
         [[ -f "$nightly_linting_results_file" ]] || echo "ERROR: No nightly results file; exit 2"
