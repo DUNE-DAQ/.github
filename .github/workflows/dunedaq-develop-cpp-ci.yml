@@ -175,13 +175,21 @@ jobs:
         if [[ "${{ inputs.caller_event_name }}" == "schedule" ]]; then
           linting_artifact_name="nightly_linting_results"
         fi
+
+        linting_file_path=$(find ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/ -name ${REPO}_linting.log | tail -n 1)
+        if [[ ! -f "$linting_file_path" ]]; then
+          echo "No file named ${REPO}_linting.log found"
+          exit 15
+        fi
+
         echo "linting_artifact_name=$linting_artifact_name" >> "$GITHUB_OUTPUT"
+        echo "linting_file_path=$linting_file_path" >> "$GITHUB_OUTPUT"
 
     - name: upload linting log file
       uses: actions/upload-artifact@v7
       with:
         name: ${{ steps.set_artifact_name.outputs.linting_artifact_name }}
-        path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/linting*/*_linting.log
+        path: ${{ steps.set_artifact_name.outputs.linting_file_path }}
   
   compare_linting_results:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
@@ -241,8 +249,17 @@ jobs:
         pr_linting_results_file=$(find pull_request_linting/ -name "${REPO}_linting.log" | tail -n 1)
         nightly_linting_results_file=$(find nightly_linting/ -name "${REPO}_linting.log" | tail -n 1)
 
-        [[ -f "$pr_linting_results_file" ]] || echo "ERROR: No PR results file; exit 1"
-        [[ -f "$nightly_linting_results_file" ]] || echo "ERROR: No nightly results file; exit 2"
+        if [[ ! -f "$pr_linting_results_file" ]]; then
+          echo "ERROR: No PR linting results file found"
+          exit 11
+        fi
+        if [[ ! -f "$nightly_linting_results_file" ]]; then
+          echo "ERROR: No nightly linting results file found"
+          exit 12
+        fi
+
+        echo "Pull request linting file: $(pr_linting_results_file)"
+        echo "Nightly linting file: $(nightly_linting_results_file)"
 
         nightly_norm=$(mktemp)
         pr_norm=$(mktemp)
@@ -257,7 +274,7 @@ jobs:
           cat "$diff_file_name"
           echo "diff_exists=true" >> "$GITHUB_OUTPUT"
           echo "diff_file_name=$diff_file_name" >> "$GITHUB_OUTPUT"
-          exit 1
+          exit 13
         else
           diff_exists="false"
         fi
