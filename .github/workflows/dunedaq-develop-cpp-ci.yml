@@ -258,8 +258,8 @@ jobs:
           exit 12
         fi
 
-        echo "Pull request linting file: $(pr_linting_results_file)"
-        echo "Nightly linting file: $(nightly_linting_results_file)"
+        echo "Pull request linting file: $pr_linting_results_file"
+        echo "Nightly linting file: $nightly_linting_results_file"
 
         nightly_norm=$(mktemp)
         pr_norm=$(mktemp)
