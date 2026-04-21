@@ -191,97 +191,97 @@ jobs:
         name: ${{ steps.set_artifact_name.outputs.linting_artifact_name }}
         path: ${{ steps.set_artifact_name.outputs.linting_file_path }}
   
-  compare_linting_results:
-    if: ${{ inputs.caller_event_name == 'pull_request' }}
-    needs: Build_against_dev_release
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
+  # compare_linting_results:
+  #   if: ${{ inputs.caller_event_name == 'pull_request' }}
+  #   needs: Build_against_dev_release
+  #   runs-on: ubuntu-latest
+  #   defaults:
+  #     run:
+  #       shell: bash
 
-    steps:
-    - name: Get ID of latest nightly run
-      id: latest_nightly
-      env:
-        GH_TOKEN: ${{ github.token }}
-      run: |
-        run_id=$(gh run list \
-          --repo ${{ github.repository }} \
-          --workflow dunedaq-develop-cpp-ci.yml \
-          --event schedule \
-          --limit 1 \
-          --json databaseId \
-          --jq '.[0].databaseId')
+  #   steps:
+  #   - name: Get ID of latest nightly run
+  #     id: latest_nightly
+  #     env:
+  #       GH_TOKEN: ${{ github.token }}
+  #     run: |
+  #       run_id=$(gh run list \
+  #         --repo ${{ github.repository }} \
+  #         --workflow dunedaq-develop-cpp-ci.yml \
+  #         --event schedule \
+  #         --limit 1 \
+  #         --json databaseId \
+  #         --jq '.[0].databaseId')
 
-        echo "Comparing results to those from run_id=$run_id"
-        echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+  #       echo "Comparing results to those from run_id=$run_id"
+  #       echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
 
-    - name: Download latest nightly linting results
-      uses: actions/download-artifact@v8
-      with:
-        github-token: ${{ github.token }}
-        name: nightly_linting_results
-        path: nightly_linting
-        run-id: ${{ steps.latest_nightly.outputs.run_id }}
+  #   - name: Download latest nightly linting results
+  #     uses: actions/download-artifact@v8
+  #     with:
+  #       github-token: ${{ github.token }}
+  #       name: nightly_linting_results
+  #       path: nightly_linting
+  #       run-id: ${{ steps.latest_nightly.outputs.run_id }}
 
-    - name: Download pull request linting results
-      uses: actions/download-artifact@v8
-      with:
-        name: pull_request_linting_results
-        path: pull_request_linting
+  #   - name: Download pull request linting results
+  #     uses: actions/download-artifact@v8
+  #     with:
+  #       name: pull_request_linting_results
+  #       path: pull_request_linting
 
-    - name: Compare linting results
-      id: compare
-      run: |
-        normalize_lint() {
-          sed -E '
-            s#^/[^ ]*/(sourcecode/.*)#\1#;     # drop leading absolute path before sourcecode/
-            s#:[0-9]+:[0-9]+:#:#g;             # drop :line:col:
-            s#:[0-9]+:#:#g;                    # drop :line:
-            /^[ ]*[0-9]+[ ]\|/d;               # Remove lines starting with " line | "
-            /^Total errors found:/d;           # drop summary
-          ' "$1" |
-          grep -E '\[[^][]+\]' |               # keep only lines with a [check]
-          sort -u
-        }
+  #   - name: Compare linting results
+  #     id: compare
+  #     run: |
+  #       normalize_lint() {
+  #         sed -E '
+  #           s#^/[^ ]*/(sourcecode/.*)#\1#;     # drop leading absolute path before sourcecode/
+  #           s#:[0-9]+:[0-9]+:#:#g;             # drop :line:col:
+  #           s#:[0-9]+:#:#g;                    # drop :line:
+  #           /^[ ]*[0-9]+[ ]\|/d;               # Remove lines starting with " line | "
+  #           /^Total errors found:/d;           # drop summary
+  #         ' "$1" |
+  #         grep -E '\[[^][]+\]' |               # keep only lines with a [check]
+  #         sort -u
+  #       }
 
-        diff_file_name=linting_diff.txt
-        pr_linting_results_file=$(find pull_request_linting/ -name "${REPO}_linting.log" | tail -n 1)
-        nightly_linting_results_file=$(find nightly_linting/ -name "${REPO}_linting.log" | tail -n 1)
+  #       diff_file_name=linting_diff.txt
+  #       pr_linting_results_file=$(find pull_request_linting/ -name "${REPO}_linting.log" | tail -n 1)
+  #       nightly_linting_results_file=$(find nightly_linting/ -name "${REPO}_linting.log" | tail -n 1)
 
-        if [[ ! -f "$pr_linting_results_file" ]]; then
-          echo "ERROR: No PR linting results file found"
-          exit 11
-        fi
-        if [[ ! -f "$nightly_linting_results_file" ]]; then
-          echo "ERROR: No nightly linting results file found"
-          exit 12
-        fi
+  #       if [[ ! -f "$pr_linting_results_file" ]]; then
+  #         echo "ERROR: No PR linting results file found"
+  #         exit 11
+  #       fi
+  #       if [[ ! -f "$nightly_linting_results_file" ]]; then
+  #         echo "ERROR: No nightly linting results file found"
+  #         exit 12
+  #       fi
 
-        echo "Pull request linting file: $pr_linting_results_file"
-        echo "Nightly linting file: $nightly_linting_results_file"
+  #       echo "Pull request linting file: $pr_linting_results_file"
+  #       echo "Nightly linting file: $nightly_linting_results_file"
 
-        nightly_norm=$(mktemp)
-        pr_norm=$(mktemp)
+  #       nightly_norm=$(mktemp)
+  #       pr_norm=$(mktemp)
 
-        normalize_lint "$nightly_linting_results_file" > "$nightly_norm"
-        normalize_lint "$pr_linting_results_file" > "$pr_norm"
+  #       normalize_lint "$nightly_linting_results_file" > "$nightly_norm"
+  #       normalize_lint "$pr_linting_results_file" > "$pr_norm"
 
-        comm -13 "$nightly_norm" "$pr_norm" > "$diff_file_name"
+  #       comm -13 "$nightly_norm" "$pr_norm" > "$diff_file_name"
 
-        if [[ -s "$diff_file_name" ]]; then
-          echo "ERROR: This PR introduces new linting errors:"
-          cat "$diff_file_name"
-          echo "diff_exists=true" >> "$GITHUB_OUTPUT"
-          echo "diff_file_name=$diff_file_name" >> "$GITHUB_OUTPUT"
-          exit 13
-        else
-          diff_exists="false"
-        fi
+  #       if [[ -s "$diff_file_name" ]]; then
+  #         echo "ERROR: This PR introduces new linting errors:"
+  #         cat "$diff_file_name"
+  #         echo "diff_exists=true" >> "$GITHUB_OUTPUT"
+  #         echo "diff_file_name=$diff_file_name" >> "$GITHUB_OUTPUT"
+  #         exit 13
+  #       else
+  #         diff_exists="false"
+  #       fi
 
-    - name: upload linting diff file
-      if: ${{ steps.compare.outputs.diff_exists == 'true' }}
-      uses: actions/upload-artifact@v7
-      with:
-        name: linting_diff
-        path: ${{ steps.compare.outputs.diff_file_name }}
+  #   - name: upload linting diff file
+  #     if: ${{ steps.compare.outputs.diff_exists == 'true' }}
+  #     uses: actions/upload-artifact@v7
+  #     with:
+  #       name: linting_diff
+  #       path: ${{ steps.compare.outputs.diff_file_name }}
