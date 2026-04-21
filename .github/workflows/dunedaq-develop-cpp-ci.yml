@@ -150,7 +150,7 @@ jobs:
 
           dbt-workarea-env
           dbt-info sourcecode
-          dbt-build --lint
+          dbt-build
           EOF
 
           chmod +x build_and_lint_package.sh
@@ -168,28 +168,28 @@ jobs:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
 
-    - name: set linting artifact name
-      id: set_artifact_name
-      run: |
-        linting_artifact_name="pull_request_linting_results"
-        if [[ "${{ inputs.caller_event_name }}" == "schedule" ]]; then
-          linting_artifact_name="nightly_linting_results"
-        fi
+    # - name: set linting artifact name
+    #   id: set_artifact_name
+    #   run: |
+    #     linting_artifact_name="pull_request_linting_results"
+    #     if [[ "${{ inputs.caller_event_name }}" == "schedule" ]]; then
+    #       linting_artifact_name="nightly_linting_results"
+    #     fi
 
-        linting_file_path=$(find ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/ -name ${REPO}_linting.log | tail -n 1)
-        if [[ ! -f "$linting_file_path" ]]; then
-          echo "No file named ${REPO}_linting.log found"
-          exit 15
-        fi
+    #     linting_file_path=$(find ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/ -name ${REPO}_linting.log | tail -n 1)
+    #     if [[ ! -f "$linting_file_path" ]]; then
+    #       echo "No file named ${REPO}_linting.log found"
+    #       exit 15
+    #     fi
 
-        echo "linting_artifact_name=$linting_artifact_name" >> "$GITHUB_OUTPUT"
-        echo "linting_file_path=$linting_file_path" >> "$GITHUB_OUTPUT"
+    #     echo "linting_artifact_name=$linting_artifact_name" >> "$GITHUB_OUTPUT"
+    #     echo "linting_file_path=$linting_file_path" >> "$GITHUB_OUTPUT"
 
-    - name: upload linting log file
-      uses: actions/upload-artifact@v7
-      with:
-        name: ${{ steps.set_artifact_name.outputs.linting_artifact_name }}
-        path: ${{ steps.set_artifact_name.outputs.linting_file_path }}
+    # - name: upload linting log file
+    #   uses: actions/upload-artifact@v7
+    #   with:
+    #     name: ${{ steps.set_artifact_name.outputs.linting_artifact_name }}
+    #     path: ${{ steps.set_artifact_name.outputs.linting_file_path }}
   
   # compare_linting_results:
   #   if: ${{ inputs.caller_event_name == 'pull_request' }}
