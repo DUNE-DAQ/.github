@@ -285,3 +285,15 @@ jobs:
       with:
         name: linting_diff
         path: ${{ steps.compare.outputs.diff_file_name }}
+
+  check_docs_links:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v6
+    - name: Check links
+      uses: lycheeverse/lychee-action@v2
+      with:
+        fail: false
