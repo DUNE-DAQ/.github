@@ -241,7 +241,7 @@ jobs:
             /^[ ]*[0-9]+[ ]\|/d;               # Remove lines starting with " line | "
             /^Total errors found:/d;           # drop summary
           ' "$1" |
-          grep -E '\[[^][]+\]' |               # keep only lines with a [check]
+          { grep -E '\[[^][]+\]' || true; }    # keep only lines with a [check]
           sort -u
         }
 
@@ -285,3 +285,21 @@ jobs:
       with:
         name: linting_diff
         path: ${{ steps.compare.outputs.diff_file_name }}
+
+  check_docs_links:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    steps:
+    - uses: actions/checkout@v6
+    - name: Check links
+      uses: lycheeverse/lychee-action@6da1d14f3a43098a294b7696d93d938aa8d20fc0
+      with:
+        fail: false
+
+    - name: Upload link checker log
+      uses: actions/upload-artifact@v7
+      with:
+        name: link_checker_log
+        path: ./lychee/out.md
