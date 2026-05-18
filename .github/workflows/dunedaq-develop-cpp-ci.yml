@@ -241,7 +241,7 @@ jobs:
             /^[ ]*[0-9]+[ ]\|/d;               # Remove lines starting with " line | "
             /^Total errors found:/d;           # drop summary
           ' "$1" |
-          grep -E '\[[^][]+\]' |               # keep only lines with a [check]
+          { grep -E '\[[^][]+\]' || true; }    # keep only lines with a [check]
           sort -u
         }
 
