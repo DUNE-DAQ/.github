@@ -150,7 +150,7 @@ jobs:
 
           dbt-workarea-env
           dbt-info sourcecode
-          dbt-build --lint
+          dbt-build --lint $REPO
           EOF
 
           chmod +x build_and_lint_package.sh
