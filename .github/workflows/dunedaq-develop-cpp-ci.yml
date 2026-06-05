@@ -241,6 +241,7 @@ jobs:
             /^[ ]*[0-9]+[ ]\|/d;               # Remove lines starting with " line | "
             /^Total errors found:/d;           # drop summary
           ' "$1" |
+          grep -E "(^|/)${REPO}(/|:)" |        # keep only lines related to this package
           { grep -E '\[[^][]+\]' || true; } |  # keep only lines with a [check]
           sort -u
         }
