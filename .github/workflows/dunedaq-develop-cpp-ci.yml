@@ -88,7 +88,7 @@ jobs:
         repository: DUNE-DAQ/daq-release
         path: daq-release
 
-    - uses: cvmfs-contrib/github-action-cvmfs@v5.5
+    - uses: cvmfs-contrib/github-action-cvmfs@d93d881391926e8146776c13345c3e23d6393acd
       with:
         cvmfs_repositories: 'dunedaq-development.opensciencegrid.org'
 
