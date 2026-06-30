@@ -119,48 +119,74 @@ jobs:
       with:
         path: ${{ github.repository }}
 
-    - name: setup build env, build the repo against the development release
+    - name: Generate dbt wrapper script
       run: |
-          BRANCH="$CALLER_BRANCH"
+        cat << 'EOF' > dbt_wrapper.sh
+        #!/bin/bash
+        source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
+        setup_dbt latest
+        cd /ghw/dev-${{ matrix.os_name }}
+        source env.sh
+        if [[ -d ".sourcecode/dbe" ]]; then
+          spack load dbe
+        fi
+        exec "$@"
+        EOF
+        
+        chmod +x dbt_wrapper.sh
+        cat dbt_wrapper.sh
 
-          cat << EOF > build_and_lint_package.sh
-          #!/bin/bash
+    - name: setup build area
+      run: |
+        BRANCH="$CALLER_BRANCH"
 
-          source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
-          setup_dbt latest
+        cat << EOF > setup_build_area.sh
+        #!/bin/bash
 
-          dbt-create ${{ steps.get_release_info.outputs.extra_dbt_args }} \
-                     ${{ steps.get_release_info.outputs.release_name}} \
-                     dev-${{ matrix.os_name }}
-          cd dev-${{ matrix.os_name }}
-          source env.sh
+        source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
+        setup_dbt latest
 
-          cd sourcecode
-          if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
-            cp -pr /ghw/DUNE-DAQ/$REPO .
-          else   # Someone opened a PR
-            export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-            /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group coredaq
-            /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group fddaq
-          fi
+        dbt-create ${{ steps.get_release_info.outputs.extra_dbt_args }} \
+                    ${{ steps.get_release_info.outputs.release_name}} \
+                    dev-${{ matrix.os_name }}
+        cd dev-${{ matrix.os_name }}
+        source env.sh
 
-          if [[ -d "./dbe" ]]; then
-            spack load dbe
-          fi
+        cd sourcecode
+        if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
+          cp -pr /ghw/DUNE-DAQ/$REPO .
+        else   # Someone opened a PR
+          export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group coredaq
+          /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group fddaq
+        fi
 
-          dbt-workarea-env
-          dbt-info sourcecode
-          dbt-build --lint $REPO
-          EOF
+        dbt-workarea-env
+        dbt-info sourcecode
+        EOF
 
-          chmod +x build_and_lint_package.sh
+        chmod +x setup_build_area.sh
+        cat setup_build_area.sh
 
-          docker run --rm \
-            -v /cvmfs:/cvmfs:shared \
-            -v "${GITHUB_WORKSPACE}:/ghw" \
-            -w /ghw \
-            ${{ needs.determine_image.outputs.image }} \
-            /ghw/build_and_lint_package.sh
+        docker run --rm \
+          -v /cvmfs:/cvmfs:shared \
+          -v "${GITHUB_WORKSPACE}:/ghw" \
+          -w /ghw \
+          ${{ needs.determine_image.outputs.image }} \
+          /ghw/setup_build_area.sh
+
+        pwd
+        ls -lrt
+        ls -lrt /ghw
+
+    - name: Run dbt-build --lint
+      run: |
+        docker run --rm \
+          -v /cvmfs:/cvmfs:shared \
+          -v "${GITHUB_WORKSPACE}:/ghw" \
+          -w /ghw \
+          ${{ needs.determine_image.outputs.image }} \
+          /ghw/dbt_wrapper.sh dbt-build --lint $REPO
 
     - name: upload build log file
       uses: actions/upload-artifact@v7
