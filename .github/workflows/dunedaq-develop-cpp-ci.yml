@@ -177,7 +177,6 @@ jobs:
 
         pwd
         ls -lrt
-        ls -lrt /ghw
 
     - name: Run dbt-build --lint
       run: |
