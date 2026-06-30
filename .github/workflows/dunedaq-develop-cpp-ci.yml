@@ -221,6 +221,7 @@ jobs:
         docker run --rm \
           -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
+          -e USER=dunedaq \
           -w /ghw \
           ${{ needs.determine_image.outputs.image }} \
           /ghw/dbt_wrapper.sh dbt-build --unittest $REPO
