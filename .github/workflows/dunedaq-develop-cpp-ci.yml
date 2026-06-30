@@ -162,7 +162,7 @@ jobs:
         fi
 
         dbt-workarea-env
-        dbt-info sourcecode
+        dbt-build
         EOF
 
         chmod +x setup_build_area.sh
@@ -178,7 +178,13 @@ jobs:
         pwd
         ls -lrt
 
-    - name: Run dbt-build --lint
+    - name: upload build log file
+      uses: actions/upload-artifact@v7
+      with:
+        name: build_log_${{ matrix.os_name }}
+        path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
+
+    - name: Run linting
       run: |
         docker run --rm \
           -v /cvmfs:/cvmfs:shared \
@@ -186,12 +192,6 @@ jobs:
           -w /ghw \
           ${{ needs.determine_image.outputs.image }} \
           /ghw/dbt_wrapper.sh dbt-build --lint $REPO
-
-    - name: upload build log file
-      uses: actions/upload-artifact@v7
-      with:
-        name: build_log_${{ matrix.os_name }}
-        path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
 
     - name: set linting artifact name
       id: set_artifact_name
@@ -215,6 +215,29 @@ jobs:
       with:
         name: ${{ steps.set_artifact_name.outputs.linting_artifact_name }}
         path: ${{ steps.set_artifact_name.outputs.linting_file_path }}
+
+    - name: Run unit tests
+      run: |
+        docker run --rm \
+          -v /cvmfs:/cvmfs:shared \
+          -v "${GITHUB_WORKSPACE}:/ghw" \
+          -w /ghw \
+          ${{ needs.determine_image.outputs.image }} \
+          /ghw/dbt_wrapper.sh dbt-build --unittest $REPO
+
+    - name: Get unit test summary path
+      id: unit_test_summary
+      run: |
+        summary_file_path=$(find . -name unit_test_summary.log -type f)
+        ./daq-release/scripts/github-ci/parse_unit_test_summary.sh $summary_file_path | tee $GITHUB_STEP_SUMMARY
+        echo "summary_file_path=$summary_file_path" >> "$GITHUB_OUTPUT"
+
+    - name: upload unit test summary file
+      uses: actions/upload-artifact@v7
+      with:
+        if-no-files-found: error
+        name: unit_test_summary
+        path: ${{ steps.unit_test_summary.outputs.summary_file_path }}
   
   compare_linting_results:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
