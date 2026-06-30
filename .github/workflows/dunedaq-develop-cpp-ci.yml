@@ -239,7 +239,26 @@ jobs:
         if-no-files-found: error
         name: unit_test_summary
         path: ${{ steps.unit_test_summary.outputs.summary_file_path }}
+
+    - name: Run clang formatting
+      id: clang_format
+      run: |
+        docker run --rm \
+          -v /cvmfs:/cvmfs:shared \
+          -v "${GITHUB_WORKSPACE}:/ghw" \
+          -e USER=dunedaq \
+          -w /ghw \
+          ${{ needs.determine_image.outputs.image }} \
+          /ghw/dbt_wrapper.sh \
+          dbt-clang-format.sh sourcecode/$REPO --view-differences-only --markdown-summary
   
+    - name: upload clang format summary file
+      uses: actions/upload-artifact@v7
+      with:
+        if-no-files-found: error
+        name: unit_test_summary
+        path: clang_format_summary_table.md
+
   compare_linting_results:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
     needs: Build_against_dev_release
