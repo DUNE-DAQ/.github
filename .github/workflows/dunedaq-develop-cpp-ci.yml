@@ -251,13 +251,21 @@ jobs:
           ${{ needs.determine_image.outputs.image }} \
           /ghw/dbt_wrapper.sh \
           dbt-clang-format.sh sourcecode/$REPO --view-differences-only --markdown-summary
+
+    - name: Get unit test summary path
+      id: clang_format_summary
+      run: |
+        file_path=$(find . -name clang_format_summary_table.md -type f)
+        cat "$file_path" >> $GITHUB_STEP_SUMMARY
+        echo "file_path=$file_path" >> "$GITHUB_OUTPUT"
+        cat "$GITHUB_OUTPUT"
   
     - name: upload clang format summary file
       uses: actions/upload-artifact@v7
       with:
         if-no-files-found: error
-        name: unit_test_summary
-        path: clang_format_summary_table.md
+        name: clang_format_summary
+        path: ${{ steps.clang_format_summary.outputs.file_path }}
 
   compare_linting_results:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
