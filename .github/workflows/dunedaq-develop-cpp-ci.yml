@@ -1,4 +1,4 @@
-name: Single-Package CI Build and Linting
+name: Single-Package CI Build and Tests
 
 permissions:
   contents: read
