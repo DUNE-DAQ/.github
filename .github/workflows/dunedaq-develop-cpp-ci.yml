@@ -146,9 +146,11 @@ jobs:
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
 
-        dbt-create ${{ steps.get_release_info.outputs.extra_dbt_args }} \
-                    ${{ steps.get_release_info.outputs.release_name}} \
-                    dev-${{ matrix.os_name }}
+        # Need the -s flag to avoid permission issues with /.spack when running
+        # inside a container as a non-root user
+        dbt-create -s ${{ steps.get_release_info.outputs.extra_dbt_args }} \
+                   ${{ steps.get_release_info.outputs.release_name}} \
+                   dev-${{ matrix.os_name }}
         cd dev-${{ matrix.os_name }}
         source env.sh
 
