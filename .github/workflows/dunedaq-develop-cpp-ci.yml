@@ -94,9 +94,7 @@ jobs:
 
     - name: Make workspace writeable for container user
       run: |
-        ls -lrt
         chmod -R o+w "${GITHUB_WORKSPACE}"
-        ls -lrt
 
     - name: Pull build image
       run: docker pull ${{ needs.determine_image.outputs.image }}
@@ -151,28 +149,16 @@ jobs:
 
         set -eo pipefail
 
-        echo "---------pwd----------"
-        pwd
-        echo "-------ls -lrt---------"
-        ls -lrt
-
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
 
         # Need the -s flag to avoid permission issues with /.spack when running
         # inside a container as a non-root user
-        dbt-create -s ${{ steps.get_release_info.outputs.extra_dbt_args }} \
+        #dbt-create -s ${{ steps.get_release_info.outputs.extra_dbt_args }} \
+        dbt-create ${{ steps.get_release_info.outputs.extra_dbt_args }} \
                    ${{ steps.get_release_info.outputs.release_name}} \
                    dev-${{ matrix.os_name }} || exit 11
-        echo "---------pwd----------"
-        pwd
-        echo "-------ls -lrt---------"
-        ls -lrt
         cd dev-${{ matrix.os_name }}
-        echo "---------pwd----------"
-        pwd
-        echo "-------ls -lrt---------"
-        ls -lrt
         source env.sh
 
         cd sourcecode
@@ -198,9 +184,6 @@ jobs:
           -w /ghw \
           ${{ needs.determine_image.outputs.image }} \
           /ghw/setup_build_area.sh
-
-        pwd
-        ls -lrt
 
     - name: upload build log file
       uses: actions/upload-artifact@v7
@@ -243,6 +226,8 @@ jobs:
 
     - name: Run unit tests
       run: |
+        # The USER environment variable needs to be set for
+        # hdf5libs unit tests to pass
         docker run --rm \
           --user $(id -u):$(id -g) \
           -v /cvmfs:/cvmfs:shared \
