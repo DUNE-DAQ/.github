@@ -143,7 +143,7 @@ jobs:
         cat << EOF > setup_build_area.sh
         #!/bin/bash
 
-        set -euo pipefail
+        set -eo pipefail
 
         echo "---------pwd----------"
         pwd
