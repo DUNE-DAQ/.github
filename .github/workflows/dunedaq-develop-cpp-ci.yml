@@ -143,6 +143,13 @@ jobs:
         cat << EOF > setup_build_area.sh
         #!/bin/bash
 
+        set -euo pipefail
+
+        echo "---------pwd----------"
+        pwd
+        echo "-------ls -lrt---------"
+        ls -lrt
+
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
 
@@ -150,13 +157,13 @@ jobs:
         # inside a container as a non-root user
         dbt-create -s ${{ steps.get_release_info.outputs.extra_dbt_args }} \
                    ${{ steps.get_release_info.outputs.release_name}} \
-                   dev-${{ matrix.os_name }}
+                   dev-${{ matrix.os_name }} | exit 11
         cd dev-${{ matrix.os_name }}
         source env.sh
 
         cd sourcecode
         if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
-          cp -pr /tmp/DUNE-DAQ/$REPO .
+          cp -pr /ghw/DUNE-DAQ/$REPO .
         else   # Someone opened a PR
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
           /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group coredaq
