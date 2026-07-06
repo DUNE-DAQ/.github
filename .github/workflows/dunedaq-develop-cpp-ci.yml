@@ -154,8 +154,7 @@ jobs:
 
         # Need the -s flag to avoid permission issues with /.spack when running
         # inside a container as a non-root user
-        #dbt-create -s ${{ steps.get_release_info.outputs.extra_dbt_args }} \
-        dbt-create ${{ steps.get_release_info.outputs.extra_dbt_args }} \
+        dbt-create -s ${{ steps.get_release_info.outputs.extra_dbt_args }} \
                    ${{ steps.get_release_info.outputs.release_name}} \
                    dev-${{ matrix.os_name }} || exit 11
         cd dev-${{ matrix.os_name }}
