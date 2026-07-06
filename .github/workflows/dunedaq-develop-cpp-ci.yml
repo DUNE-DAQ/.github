@@ -92,6 +92,12 @@ jobs:
       with:
         cvmfs_repositories: 'dunedaq-development.opensciencegrid.org'
 
+    - name: Make workspace writeable for container user
+      run: |
+        ls -lrt
+        chmod -R o+w "${GITHUB_WORKSPACE}"
+        ls -lrt
+
     - name: Pull build image
       run: docker pull ${{ needs.determine_image.outputs.image }}
         
@@ -125,7 +131,7 @@ jobs:
         #!/bin/bash
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
-        cd /tmp/dev-${{ matrix.os_name }}
+        cd /ghw/dev-${{ matrix.os_name }}
         source env.sh
         if [[ -d ".sourcecode/dbe" ]]; then
           spack load dbe
@@ -158,7 +164,15 @@ jobs:
         dbt-create -s ${{ steps.get_release_info.outputs.extra_dbt_args }} \
                    ${{ steps.get_release_info.outputs.release_name}} \
                    dev-${{ matrix.os_name }} || exit 11
+        echo "---------pwd----------"
+        pwd
+        echo "-------ls -lrt---------"
+        ls -lrt
         cd dev-${{ matrix.os_name }}
+        echo "---------pwd----------"
+        pwd
+        echo "-------ls -lrt---------"
+        ls -lrt
         source env.sh
 
         cd sourcecode
@@ -181,7 +195,7 @@ jobs:
           --user $(id -u):$(id -g) \
           -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
-          -w /tmp \
+          -w /ghw \
           ${{ needs.determine_image.outputs.image }} \
           /ghw/setup_build_area.sh
 
@@ -200,7 +214,7 @@ jobs:
           --user $(id -u):$(id -g) \
           -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
-          -w /tmp \
+          -w /ghw \
           ${{ needs.determine_image.outputs.image }} \
           /ghw/dbt_wrapper.sh dbt-build --lint $REPO
 
@@ -234,7 +248,7 @@ jobs:
           -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
           -e USER=dunedaq \
-          -w /tmp \
+          -w /ghw \
           ${{ needs.determine_image.outputs.image }} \
           /ghw/dbt_wrapper.sh dbt-build --unittest $REPO
 
@@ -259,7 +273,7 @@ jobs:
           -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
           -e USER=dunedaq \
-          -w /tmp \
+          -w /ghw \
           ${{ needs.determine_image.outputs.image }} \
           /ghw/dbt_wrapper.sh \
           dbt-clang-format.sh sourcecode/$REPO --view-differences-only --markdown-summary
