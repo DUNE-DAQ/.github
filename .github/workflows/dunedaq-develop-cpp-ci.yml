@@ -125,7 +125,7 @@ jobs:
         #!/bin/bash
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
-        cd /ghw/dev-${{ matrix.os_name }}
+        cd /tmp/dev-${{ matrix.os_name }}
         source env.sh
         if [[ -d ".sourcecode/dbe" ]]; then
           spack load dbe
@@ -154,7 +154,7 @@ jobs:
 
         cd sourcecode
         if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
-          cp -pr /ghw/DUNE-DAQ/$REPO .
+          cp -pr /tmp/DUNE-DAQ/$REPO .
         else   # Someone opened a PR
           export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
           /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group coredaq
@@ -169,9 +169,10 @@ jobs:
         cat setup_build_area.sh
 
         docker run --rm \
+          --user $(id -u):$(id -g) \
           -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
-          -w /ghw \
+          -w /tmp \
           ${{ needs.determine_image.outputs.image }} \
           /ghw/setup_build_area.sh
 
@@ -187,9 +188,10 @@ jobs:
     - name: Run linting
       run: |
         docker run --rm \
+          --user $(id -u):$(id -g) \
           -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
-          -w /ghw \
+          -w /tmp \
           ${{ needs.determine_image.outputs.image }} \
           /ghw/dbt_wrapper.sh dbt-build --lint $REPO
 
@@ -219,10 +221,11 @@ jobs:
     - name: Run unit tests
       run: |
         docker run --rm \
+          --user $(id -u):$(id -g) \
           -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
           -e USER=dunedaq \
-          -w /ghw \
+          -w /tmp \
           ${{ needs.determine_image.outputs.image }} \
           /ghw/dbt_wrapper.sh dbt-build --unittest $REPO
 
@@ -247,7 +250,7 @@ jobs:
           -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
           -e USER=dunedaq \
-          -w /ghw \
+          -w /tmp \
           ${{ needs.determine_image.outputs.image }} \
           /ghw/dbt_wrapper.sh \
           dbt-clang-format.sh sourcecode/$REPO --view-differences-only --markdown-summary
