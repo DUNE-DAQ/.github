@@ -190,6 +190,33 @@ jobs:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
 
+    - name: Run unit tests
+      run: |
+        # The USER environment variable needs to be set for
+        # hdf5libs unit tests to pass
+        docker run --rm \
+          --user $(id -u):$(id -g) \
+          -v /cvmfs:/cvmfs:shared \
+          -v "${GITHUB_WORKSPACE}:/ghw" \
+          -e USER=dunedaq \
+          -w /ghw \
+          ${{ needs.determine_image.outputs.image }} \
+          /ghw/dbt_wrapper.sh dbt-build --unittest $REPO
+
+    - name: Get unit test summary path
+      id: unit_test_summary
+      run: |
+        summary_file_path=$(find . -name unit_test_summary.log -type f)
+        ./daq-release/scripts/github-ci/parse_unit_test_summary.sh $summary_file_path | tee $GITHUB_STEP_SUMMARY
+        echo "summary_file_path=$summary_file_path" >> "$GITHUB_OUTPUT"
+
+    - name: upload unit test summary file
+      uses: actions/upload-artifact@v7
+      with:
+        if-no-files-found: error
+        name: unit_test_summary
+        path: ${{ steps.unit_test_summary.outputs.summary_file_path }}
+
     - name: Run linting
       run: |
         docker run --rm \
@@ -222,33 +249,6 @@ jobs:
       with:
         name: ${{ steps.set_artifact_name.outputs.linting_artifact_name }}
         path: ${{ steps.set_artifact_name.outputs.linting_file_path }}
-
-    - name: Run unit tests
-      run: |
-        # The USER environment variable needs to be set for
-        # hdf5libs unit tests to pass
-        docker run --rm \
-          --user $(id -u):$(id -g) \
-          -v /cvmfs:/cvmfs:shared \
-          -v "${GITHUB_WORKSPACE}:/ghw" \
-          -e USER=dunedaq \
-          -w /ghw \
-          ${{ needs.determine_image.outputs.image }} \
-          /ghw/dbt_wrapper.sh dbt-build --unittest $REPO
-
-    - name: Get unit test summary path
-      id: unit_test_summary
-      run: |
-        summary_file_path=$(find . -name unit_test_summary.log -type f)
-        ./daq-release/scripts/github-ci/parse_unit_test_summary.sh $summary_file_path | tee $GITHUB_STEP_SUMMARY
-        echo "summary_file_path=$summary_file_path" >> "$GITHUB_OUTPUT"
-
-    - name: upload unit test summary file
-      uses: actions/upload-artifact@v7
-      with:
-        if-no-files-found: error
-        name: unit_test_summary
-        path: ${{ steps.unit_test_summary.outputs.summary_file_path }}
 
     - name: Run clang formatting
       id: clang_format
