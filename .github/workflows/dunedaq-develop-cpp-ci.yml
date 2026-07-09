@@ -1,4 +1,4 @@
-name: Single-Package CI Build and Linting
+name: Single-Package CI Build and Tests
 
 permissions:
   contents: read
@@ -92,6 +92,10 @@ jobs:
       with:
         cvmfs_repositories: 'dunedaq-development.opensciencegrid.org'
 
+    - name: Make workspace writeable for container user
+      run: |
+        chmod -R o+w "${GITHUB_WORKSPACE}"
+
     - name: Pull build image
       run: docker pull ${{ needs.determine_image.outputs.image }}
         
@@ -119,54 +123,109 @@ jobs:
       with:
         path: ${{ github.repository }}
 
-    - name: setup build env, build the repo against the development release
+    - name: Generate dbt wrapper script
       run: |
-          BRANCH="$CALLER_BRANCH"
+        cat << 'EOF' > dbt_wrapper.sh
+        #!/bin/bash
+        source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
+        setup_dbt latest
+        cd /ghw/dev-${{ matrix.os_name }}
+        source env.sh
+        if [[ -d ".sourcecode/dbe" ]]; then
+          spack load dbe
+        fi
+        exec "$@"
+        EOF
+        
+        chmod +x dbt_wrapper.sh
+        cat dbt_wrapper.sh
 
-          cat << EOF > build_and_lint_package.sh
-          #!/bin/bash
+    - name: setup build area
+      run: |
+        BRANCH="$CALLER_BRANCH"
 
-          source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
-          setup_dbt latest
+        cat << EOF > setup_build_area.sh
+        #!/bin/bash
 
-          dbt-create ${{ steps.get_release_info.outputs.extra_dbt_args }} \
-                     ${{ steps.get_release_info.outputs.release_name}} \
-                     dev-${{ matrix.os_name }}
-          cd dev-${{ matrix.os_name }}
-          source env.sh
+        set -eo pipefail
 
-          cd sourcecode
-          if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
-            cp -pr /ghw/DUNE-DAQ/$REPO .
-          else   # Someone opened a PR
-            export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
-            /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group coredaq
-            /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group fddaq
-          fi
+        source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
+        setup_dbt latest
 
-          if [[ -d "./dbe" ]]; then
-            spack load dbe
-          fi
+        # Need the -s flag to avoid permission issues with /.spack when running
+        # inside a container as a non-root user
+        dbt-create -s ${{ steps.get_release_info.outputs.extra_dbt_args }} \
+                   ${{ steps.get_release_info.outputs.release_name}} \
+                   dev-${{ matrix.os_name }} || exit 11
+        cd dev-${{ matrix.os_name }}
+        source env.sh
 
-          dbt-workarea-env
-          dbt-info sourcecode
-          dbt-build --lint $REPO
-          EOF
+        cd sourcecode
+        if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
+          cp -pr /ghw/DUNE-DAQ/$REPO .
+        else   # Someone opened a PR
+          export GITHUB_TOKEN=${{ secrets.GITHUB_TOKEN }}
+          /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group coredaq
+          /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group fddaq
+        fi
 
-          chmod +x build_and_lint_package.sh
+        dbt-workarea-env
+        dbt-build
+        EOF
 
-          docker run --rm \
-            -v /cvmfs:/cvmfs:shared \
-            -v "${GITHUB_WORKSPACE}:/ghw" \
-            -w /ghw \
-            ${{ needs.determine_image.outputs.image }} \
-            /ghw/build_and_lint_package.sh
+        chmod +x setup_build_area.sh
+        cat setup_build_area.sh
+
+        docker run --rm \
+          --user $(id -u):$(id -g) \
+          -v /cvmfs:/cvmfs:shared \
+          -v "${GITHUB_WORKSPACE}:/ghw" \
+          -w /ghw \
+          ${{ needs.determine_image.outputs.image }} \
+          /ghw/setup_build_area.sh
 
     - name: upload build log file
       uses: actions/upload-artifact@v7
       with:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
+
+    - name: Run unit tests
+      run: |
+        # The USER environment variable needs to be set for
+        # hdf5libs unit tests to pass
+        docker run --rm \
+          --user $(id -u):$(id -g) \
+          -v /cvmfs:/cvmfs:shared \
+          -v "${GITHUB_WORKSPACE}:/ghw" \
+          -e USER=dunedaq \
+          -w /ghw \
+          ${{ needs.determine_image.outputs.image }} \
+          /ghw/dbt_wrapper.sh dbt-build --unittest $REPO
+
+    - name: Get unit test summary path
+      id: unit_test_summary
+      run: |
+        summary_file_path=$(find . -name unit_test_summary.log -type f)
+        ./daq-release/scripts/github-ci/parse_unit_test_summary.sh $summary_file_path | tee $GITHUB_STEP_SUMMARY
+        echo "summary_file_path=$summary_file_path" >> "$GITHUB_OUTPUT"
+
+    - name: upload unit test summary file
+      uses: actions/upload-artifact@v7
+      with:
+        if-no-files-found: error
+        name: unit_test_summary
+        path: ${{ steps.unit_test_summary.outputs.summary_file_path }}
+
+    - name: Run linting
+      run: |
+        docker run --rm \
+          --user $(id -u):$(id -g) \
+          -v /cvmfs:/cvmfs:shared \
+          -v "${GITHUB_WORKSPACE}:/ghw" \
+          -w /ghw \
+          ${{ needs.determine_image.outputs.image }} \
+          /ghw/dbt_wrapper.sh dbt-build --lint $REPO
 
     - name: set linting artifact name
       id: set_artifact_name
@@ -190,7 +249,34 @@ jobs:
       with:
         name: ${{ steps.set_artifact_name.outputs.linting_artifact_name }}
         path: ${{ steps.set_artifact_name.outputs.linting_file_path }}
+
+    - name: Run clang formatting
+      id: clang_format
+      run: |
+        docker run --rm \
+          -v /cvmfs:/cvmfs:shared \
+          -v "${GITHUB_WORKSPACE}:/ghw" \
+          -e USER=dunedaq \
+          -w /ghw \
+          ${{ needs.determine_image.outputs.image }} \
+          /ghw/dbt_wrapper.sh \
+          dbt-clang-format.sh sourcecode/$REPO --view-differences-only --markdown-summary
+
+    - name: Get unit test summary path
+      id: clang_format_summary
+      run: |
+        file_path=$(find . -name clang_format_summary_table.md -type f)
+        cat "$file_path" >> $GITHUB_STEP_SUMMARY
+        echo "file_path=$file_path" >> "$GITHUB_OUTPUT"
+        cat "$GITHUB_OUTPUT"
   
+    - name: upload clang format summary file
+      uses: actions/upload-artifact@v7
+      with:
+        if-no-files-found: error
+        name: clang_format_summary
+        path: ${{ steps.clang_format_summary.outputs.file_path }}
+
   compare_linting_results:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
     needs: Build_against_dev_release
@@ -209,9 +295,9 @@ jobs:
           --repo ${{ github.repository }} \
           --workflow dunedaq-develop-cpp-ci.yml \
           --event schedule \
-          --limit 1 \
-          --json databaseId \
-          --jq '.[0].databaseId')
+          --limit 10 \
+          --json databaseId,conclusion \
+          --jq '[.[] | select(.conclusion=="success")] | first | .databaseId')
 
         echo "Comparing results to those from run_id=$run_id"
         echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
