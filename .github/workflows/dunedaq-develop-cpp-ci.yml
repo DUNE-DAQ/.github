@@ -169,7 +169,7 @@ jobs:
           /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group fddaq
         fi
 
-        if [[ -d ".sourcecode/dbe" ]]; then
+        if [[ -d "./dbe" ]]; then
           spack load dbe
         fi
 
