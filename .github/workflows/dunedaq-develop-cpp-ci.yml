@@ -161,6 +161,11 @@ jobs:
         source env.sh
 
         cd sourcecode
+
+        if [[ -d ".sourcecode/dbe" ]]; then
+          spack load dbe
+        fi
+
         if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
           cp -pr /ghw/DUNE-DAQ/$REPO .
         else   # Someone opened a PR
