@@ -393,6 +393,8 @@ jobs:
     - uses: actions/checkout@v7
     - name: Check links
       uses: lycheeverse/lychee-action@649b0e4890508ea3e11ea6b3ee35ce899a25afd5
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         fail: false
         failIfEmpty: false
@@ -401,12 +403,15 @@ jobs:
           --accept 200,403
           --exclude '^https://twiki\.cern\.ch/.*'
           --exclude '^https://indico\..*'
+          --exclude '^https://cernbox.cern.ch\..*'
           --exclude '^https://wiki\.dunescience\.org/.*'
           --exclude '^https://github\.com/DUNE-DAQ/drunc/wiki/Archive:.*'
-          docs/
+          --github-token ${{ env.GITHUB_TOKEN }}
+          .
 
     - name: Upload link checker log
       uses: actions/upload-artifact@v7
       with:
         name: link_checker_log
-        path: ./lychee/out.md
+        path: ./lychee/out.md/
+
