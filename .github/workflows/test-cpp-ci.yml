@@ -3,14 +3,30 @@ description: >
   Test the C++ develop workflow using a checked out repository
 
 on:
-  push:
-    branches-ignore: [develop]
   workflow_dispatch:
+    inputs:
+      caller_event_name:
+        default: 'schedule'
+        type: string
+        description: "Flag to distinguish between e.g. schedule and pull request"
+      target_branch:
+        type: string
+        default: ''
+        description: "Branch this change targets (e.g. develop). Affects the release image and whether matching feature branches are cloned. Leave blank to use the current branch."
+      repo_name:
+        type: string
+        default: 'hdf5libs'
+        description: "Optionally specify a repository for testing purposes (not to be used in scheduled/PR runs)"
+      upstream_workflow_branch:
+        type: string
+        default: 'develop'
+        description: "Specify a branch of the organization-level workflow to use for testing purposes (not to be used in scheduled/PR runs)"
 
 jobs:
   test:
     uses: ./.github/workflows/dunedaq-develop-cpp-ci.yml
     with:
-      caller_event_name: 'schedule'
-      repo_name: 'hdf5libs'
-      upstream_workflow_branch: ${{ github.ref_name }}
+      caller_event_name:        ${{ inputs.caller_event_name }}
+      target_branch:            ${{ inputs.target_branch}}
+      repo_name:                ${{ inputs.repo_name }}
+      upstream_workflow_branch: ${{ inputs.upstream_workflow_branch }}
