@@ -13,10 +13,10 @@ on:
         type: string
         default: ''
         description: "Branch this change targets (e.g. develop). Affects the release image and whether matching feature branches are cloned. Leave blank to use the current branch."
-      repo_name:
+      repository:
         type: string
-        default: 'hdf5libs'
-        description: "Optionally specify a repository for testing purposes (not to be used in scheduled/PR runs)"
+        default: 'DUNE-DAQ/hdf5libs'
+        description: "Optionally specify owner/repository for testing purposes (not to be used in scheduled/PR runs)"
       upstream_workflow_branch:
         type: string
         default: 'develop'
@@ -28,5 +28,5 @@ jobs:
     with:
       caller_event_name:        ${{ inputs.caller_event_name }}
       target_branch:            ${{ inputs.target_branch}}
-      repo_name:                ${{ inputs.repo_name }}
+      repository:               ${{ inputs.repository }}
       upstream_workflow_branch: ${{ inputs.upstream_workflow_branch }}
