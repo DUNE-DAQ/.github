@@ -1,0 +1,16 @@
+name: Test Single-Package CI Workflow
+description: >
+  Test the C++ develop workflow using a checked out repository
+
+on:
+  push:
+    branches-ignore: [develop]
+  workflow_dispatch:
+
+jobs:
+  test:
+    uses: ./.github/workflows/dunedaq-develop-cpp-ci.yml
+    with:
+      caller_event_name: 'schedule'
+      repo_name: 'hdf5libs'
+      upstream_workflow_branch: ${{ github.ref_name }}
