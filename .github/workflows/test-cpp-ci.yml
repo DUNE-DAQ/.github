@@ -11,7 +11,7 @@ on:
         description: "Flag to distinguish between e.g. schedule and pull request"
       target_branch:
         type: string
-        default: ''
+        default: 'develop'
         description: "Branch this change targets (e.g. develop). Affects the release image and whether matching feature branches are cloned. Leave blank to use the current branch."
       repository:
         type: string
