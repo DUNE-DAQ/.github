@@ -4,12 +4,34 @@ permissions:
   contents: read
 
 on:
+  workflow_dispatch:
+    inputs:
+      caller_event_name:
+        default: 'schedule'
+        type: string
+        description: "Flag to distinguish between e.g. schedule and pull request"
+      caller_branch:
+        type: string
+        default: 'develop'
+        description: "Override the caller's branch for testing purposes (not to be used in scheduled/PR runs)"
+      target_branch:
+        type: string
+        default: 'develop'
+        description: "Branch this change targets (e.g. develop). Affects the release image and whether matching feature branches are cloned. Leave blank to use the current branch."
+      repository:
+        type: string
+        default: 'DUNE-DAQ/hdf5libs'
+        description: "Optionally specify owner/repository for testing purposes (not to be used in scheduled/PR runs)"
   workflow_call:
     inputs:
       caller_event_name:
         required: true
         type: string
         description: "Flag to distinguish between e.g. schedule and pull request"
+      caller_branch:
+        type: string
+        default: ''
+        description: "Override the caller's branch for testing purposes (not to be used in scheduled/PR runs)"
       target_branch:
         type: string
         default: ''
@@ -18,13 +40,9 @@ on:
         type: string
         default: ${{ github.repository }}
         description: "Optionally specify a repository for testing purposes (not to be used in scheduled/PR runs)"
-      upstream_workflow_branch:
-        type: string
-        default: 'develop'
-        description: "Specify a branch of the organization-level workflow to use for testing purposes (not to be used in scheduled/PR runs)"
 
 env:
-  CALLER_BRANCH: ${{ github.head_ref || github.ref_name }}
+  CALLER_BRANCH: ${{ inputs.caller_branch || github.head_ref || github.ref_name }}
   TARGET_BRANCH: ${{ inputs.target_branch || github.base_ref || github.ref_name }}
 
 jobs:

@@ -11,16 +11,16 @@ on:
         description: "Flag to distinguish between e.g. schedule and pull request"
       target_branch:
         type: string
-        default: 'amogan/implement_test_workflow'
+        default: 'develop'
         description: "Branch this change targets (e.g. develop). Affects the release image and whether matching feature branches are cloned. Leave blank to use the current branch."
+      caller_branch:
+        type: string
+        default: 'develop'
+        description: "Override the caller's branch for testing purposes (not to be used in scheduled/PR runs)"
       repository:
         type: string
         default: 'DUNE-DAQ/hdf5libs'
         description: "Optionally specify owner/repository for testing purposes (not to be used in scheduled/PR runs)"
-      upstream_workflow_branch:
-        type: string
-        default: 'develop'
-        description: "Specify a branch of the organization-level workflow to use for testing purposes (not to be used in scheduled/PR runs)"
 
 jobs:
   test:
@@ -29,4 +29,3 @@ jobs:
       caller_event_name:        ${{ inputs.caller_event_name }}
       target_branch:            ${{ inputs.target_branch}}
       repository:               ${{ inputs.repository }}
-      upstream_workflow_branch: ${{ inputs.upstream_workflow_branch }}
