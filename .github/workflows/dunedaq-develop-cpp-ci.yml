@@ -14,11 +14,18 @@ on:
         type: string
         default: ''
         description: "Branch this change targets (e.g. develop). Affects the release image and whether matching feature branches are cloned. Leave blank to use the current branch."
+      repo_name:
+        type: string
+        default: ${{ github.event.repository.name }}
+        description: "Optionally specify a repository for testing purposes (not to be used in scheduled/PR runs)"
+      upstream_workflow_branch:
+        type: string
+        default: 'develop'
+        description: "Specify a branch of the organization-level workflow to use for testing purposes (not to be used in scheduled/PR runs)"
 
 env:
   CALLER_BRANCH: ${{ github.head_ref || github.ref_name }}
   TARGET_BRANCH: ${{ inputs.target_branch || github.base_ref || github.ref_name }}
-  REPO: ${{ github.event.repository.name }}
 
 jobs:
   Should_run:
@@ -30,7 +37,7 @@ jobs:
       - name: checkout package for CI
         uses: actions/checkout@v7
         with:
-          path: ${{ github.repository }}
+          path: ${{ env.REPOSITORY }}
 
       - id: check
         run: |
@@ -81,6 +88,8 @@ jobs:
         include:
           - image: ${{ needs.determine_image.outputs.image }}
             os_name: "a9"
+    env:
+      REPO: ${{ inputs.repo_name }}
     defaults:
       run:
         shell: bash
