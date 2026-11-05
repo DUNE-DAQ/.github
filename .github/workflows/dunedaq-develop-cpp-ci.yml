@@ -37,7 +37,7 @@ jobs:
       - name: checkout package for CI
         uses: actions/checkout@v7
         with:
-          path: ${{ github.repository }}
+          path: ${{ inputs.repo_name }}
 
       - id: check
         run: |
@@ -45,7 +45,7 @@ jobs:
             echo "should_run=true" >> $GITHUB_OUTPUT
           else
 
-            cd $GITHUB_WORKSPACE/${{ github.repository }}
+            cd $GITHUB_WORKSPACE/${{ inputs.repo_name }}
             git checkout $TARGET_BRANCH
             commit_time=$( git log -1 --format=%ct )
             current_time=$( date +%s )
@@ -134,7 +134,7 @@ jobs:
     - name: checkout package for CI
       uses: actions/checkout@v7
       with:
-        path: ${{ github.repository }}
+        path: ${{ inputs.repo_name }}
 
     - name: Generate dbt wrapper script
       run: |
