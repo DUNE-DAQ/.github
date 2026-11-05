@@ -37,7 +37,7 @@ jobs:
       - name: checkout package for CI
         uses: actions/checkout@v7
         with:
-          path: ${{ env.REPOSITORY }}
+          path: ${{ github.repository }}
 
       - id: check
         run: |
