@@ -360,6 +360,7 @@ jobs:
       uses: actions/download-artifact@v8
       with:
         github-token: ${{ github.token }}
+        repository: ${{ inputs.repository }}
         name: nightly_linting_results
         path: nightly_linting
         run-id: ${{ steps.latest_nightly.outputs.run_id }}
