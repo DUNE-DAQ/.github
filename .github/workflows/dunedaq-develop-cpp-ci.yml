@@ -333,8 +333,10 @@ jobs:
 
   compare_linting_results:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
-    needs: Build_against_dev_release
+    needs: [Should_run, Build_against_dev_release]
     runs-on: ubuntu-latest
+    env:
+      REPO: ${{ needs.Should_run.outputs.repo_name }}
     defaults:
       run:
         shell: bash
