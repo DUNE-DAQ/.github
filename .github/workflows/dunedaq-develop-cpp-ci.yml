@@ -413,6 +413,7 @@ jobs:
 
         comm -13 "$nightly_norm" "$pr_norm" > "$diff_file_name"
 
+        diff_exists=""
         if [[ -s "$diff_file_name" ]]; then
           echo "ERROR: This PR introduces new linting errors:"
           cat "$diff_file_name"
@@ -424,6 +425,8 @@ jobs:
         fi
 
         echo "diff_exists=$diff_exists" >> "$GITHUB_OUTPUT"
+
+        cat "$GITHUB_OUTPUT"
 
     - name: upload linting diff file
       if: ${{ steps.compare.outputs.diff_exists == 'true' }}
