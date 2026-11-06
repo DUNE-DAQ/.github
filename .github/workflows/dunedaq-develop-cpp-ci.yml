@@ -295,6 +295,8 @@ jobs:
 
         echo "linting_artifact_name=$linting_artifact_name" >> "$GITHUB_OUTPUT"
         echo "linting_file_path=$linting_file_path" >> "$GITHUB_OUTPUT"
+        
+        cat "$GITHUB_OUTPUT"
 
     - name: upload linting log file
       uses: actions/upload-artifact@v7
