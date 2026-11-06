@@ -346,7 +346,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         run_id=$(gh run list \
-          --repo ${{ github.repository }} \
+          --repo ${{ inputs.repository }} \
           --workflow dunedaq-develop-cpp-ci.yml \
           --event schedule \
           --limit 10 \
