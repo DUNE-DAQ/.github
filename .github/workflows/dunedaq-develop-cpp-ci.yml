@@ -418,7 +418,6 @@ jobs:
 
         echo "diff_exists=false" >> "$GITHUB_OUTPUT"
 
-
     - name: upload linting diff file
       if: ${{ failure() && steps.compare.outputs.diff_exists == 'true' }}
       uses: actions/upload-artifact@v7
