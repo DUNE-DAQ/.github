@@ -419,14 +419,15 @@ jobs:
           cat "$diff_file_name"
           echo "diff_exists=true" >> "$GITHUB_OUTPUT"
           echo "diff_file_name=$diff_file_name" >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
           exit 13
         else
           diff_exists="false"
+          cat "$GITHUB_OUTPUT"
         fi
 
         echo "diff_exists=$diff_exists" >> "$GITHUB_OUTPUT"
 
-        cat "$GITHUB_OUTPUT"
 
     - name: upload linting diff file
       if: ${{ steps.compare.outputs.diff_exists == 'true' }}
