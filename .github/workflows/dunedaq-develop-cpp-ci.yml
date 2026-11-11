@@ -5,33 +5,64 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      caller_event_name:
+        default: 'schedule'
+        type: string
+        description: "Flag to distinguish between e.g. schedule and pull request"
+      caller_branch:
+        type: string
+        default: 'develop'
+        description: "Override the caller's branch for testing purposes (not to be used in scheduled/PR runs)"
+      target_branch:
+        type: string
+        default: 'develop'
+        description: "Branch this change targets (e.g. develop). Affects the release image and whether matching feature branches are cloned. Leave blank to use the current branch."
+      repository:
+        type: string
+        default: 'DUNE-DAQ/hdf5libs'
+        description: "Optionally specify owner/repository for testing purposes (not to be used in scheduled/PR runs)"
   workflow_call:
     inputs:
       caller_event_name:
         required: true
         type: string
         description: "Flag to distinguish between e.g. schedule and pull request"
+      caller_branch:
+        type: string
+        default: ''
+        description: "Override the caller's branch for testing purposes (not to be used in scheduled/PR runs)"
       target_branch:
         type: string
         default: ''
         description: "Branch this change targets (e.g. develop). Affects the release image and whether matching feature branches are cloned. Leave blank to use the current branch."
+      repository:
+        type: string
+        default: ${{ github.repository }}
+        description: "Optionally specify a repository for testing purposes (not to be used in scheduled/PR runs)"
 
 env:
-  CALLER_BRANCH: ${{ github.head_ref || github.ref_name }}
+  CALLER_BRANCH: ${{ inputs.caller_branch || github.head_ref || github.ref_name }}
   TARGET_BRANCH: ${{ inputs.target_branch || github.base_ref || github.ref_name }}
-  REPO: ${{ github.event.repository.name }}
 
 jobs:
   Should_run:
     runs-on: ubuntu-latest
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
+      repo_name: ${{ steps.set_repo_name.outputs.repo_name }}
     steps:
+      - id: set_repo_name
+        run: |
+          # e.g., "DUNE-DAQ/hdf5libs" -> "hdf5libs"
+          REPOSITORY=${{ inputs.repository }}
+          echo "repo_name=${REPOSITORY#*/}" >> "$GITHUB_OUTPUT"
 
       - name: checkout package for CI
         uses: actions/checkout@v7
         with:
-          path: ${{ github.repository }}
+          repository: ${{ inputs.repository }}
+          path:       ${{ steps.set_repo_name.outputs.repo_name }}
 
       - id: check
         run: |
@@ -39,7 +70,7 @@ jobs:
             echo "should_run=true" >> $GITHUB_OUTPUT
           else
 
-            cd $GITHUB_WORKSPACE/${{ github.repository }}
+            cd $GITHUB_WORKSPACE/${{ steps.set_repo_name.outputs.repo_name }}
             git checkout $TARGET_BRANCH
             commit_time=$( git log -1 --format=%ct )
             current_time=$( date +%s )
@@ -74,7 +105,7 @@ jobs:
           fi
 
   Build_against_dev_release:
-    needs: Determine_image
+    needs: [Should_run, Determine_image]
     name: build_against_dev_on_${{ matrix.os_name }}
     runs-on: ubuntu-latest
     strategy:
@@ -82,6 +113,8 @@ jobs:
         include:
           - image: ${{ needs.determine_image.outputs.image }}
             os_name: "a9"
+    env:
+      REPO: ${{ needs.Should_run.outputs.repo_name }}
     defaults:
       run:
         shell: bash
@@ -126,7 +159,8 @@ jobs:
     - name: checkout package for CI
       uses: actions/checkout@v7
       with:
-        path: ${{ github.repository }}
+        repository: ${{ inputs.repository }}
+        path:       ${{ env.REPO }}
 
     - name: Generate dbt wrapper script
       run: |
@@ -170,7 +204,7 @@ jobs:
         cd sourcecode
 
         if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
-          cp -pr /ghw/DUNE-DAQ/$REPO .
+          cp -pr /ghw/$REPO .
         else   # Someone opened a PR
           export GITHUB_TOKEN=$GITHUB_TOKEN
           /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group coredaq
@@ -255,6 +289,8 @@ jobs:
 
         echo "linting_artifact_name=$linting_artifact_name" >> "$GITHUB_OUTPUT"
         echo "linting_file_path=$linting_file_path" >> "$GITHUB_OUTPUT"
+        
+        cat "$GITHUB_OUTPUT"
 
     - name: upload linting log file
       uses: actions/upload-artifact@v7
@@ -291,8 +327,10 @@ jobs:
 
   compare_linting_results:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
-    needs: Build_against_dev_release
+    needs: [Should_run, Build_against_dev_release]
     runs-on: ubuntu-latest
+    env:
+      REPO: ${{ needs.Should_run.outputs.repo_name }}
     defaults:
       run:
         shell: bash
@@ -304,7 +342,7 @@ jobs:
         GH_TOKEN: ${{ github.token }}
       run: |
         run_id=$(gh run list \
-          --repo ${{ github.repository }} \
+          --repo ${{ inputs.repository }} \
           --workflow dunedaq-develop-cpp-ci.yml \
           --event schedule \
           --limit 10 \
@@ -318,6 +356,7 @@ jobs:
       uses: actions/download-artifact@v8
       with:
         github-token: ${{ github.token }}
+        repository: ${{ inputs.repository }}
         name: nightly_linting_results
         path: nightly_linting
         run-id: ${{ steps.latest_nightly.outputs.run_id }}
@@ -368,18 +407,19 @@ jobs:
 
         comm -13 "$nightly_norm" "$pr_norm" > "$diff_file_name"
 
+        diff_exists=""
         if [[ -s "$diff_file_name" ]]; then
           echo "ERROR: This PR introduces new linting errors:"
           cat "$diff_file_name"
           echo "diff_exists=true" >> "$GITHUB_OUTPUT"
           echo "diff_file_name=$diff_file_name" >> "$GITHUB_OUTPUT"
           exit 13
-        else
-          diff_exists="false"
         fi
 
+        echo "diff_exists=false" >> "$GITHUB_OUTPUT"
+
     - name: upload linting diff file
-      if: ${{ steps.compare.outputs.diff_exists == 'true' }}
+      if: ${{ failure() && steps.compare.outputs.diff_exists == 'true' }}
       uses: actions/upload-artifact@v7
       with:
         name: linting_diff
