@@ -222,7 +222,6 @@ jobs:
 
         docker run --rm \
           --user $(id -u):$(id -g) \
-          -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
           -w /ghw \
           ${{ matrix.image }} \
