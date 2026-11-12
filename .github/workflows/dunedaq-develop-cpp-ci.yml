@@ -66,6 +66,7 @@ jobs:
         with:
           repository: ${{ inputs.repository }}
           path:       ${{ steps.set_repo_name.outputs.repo_name }}
+          ref:        ${{ env.TARGET_BRANCH }}
 
       - id: check
         run: |
@@ -74,7 +75,6 @@ jobs:
           else
 
             cd $GITHUB_WORKSPACE/${{ steps.set_repo_name.outputs.repo_name }}
-            git checkout $TARGET_BRANCH
             commit_time=$( git log -1 --format=%ct )
             current_time=$( date +%s )
 
@@ -114,10 +114,10 @@ jobs:
 
           cat "$GITHUB_OUTPUT"
 
-  Build_against_dev_release:
+  create_build_area:
     needs: setup
     if: ${{ needs.setup.outputs.should_run == 'true' }}
-    name: build_against_dev_on_${{ matrix.os_name }}
+    name: create_dev_area_on_${{ matrix.os_name }}
     runs-on: ubuntu-latest
     container:
       image: ${{ needs.setup.outputs.image }}
@@ -130,6 +130,7 @@ jobs:
           - os_name: "a9"
     env:
       REPO: ${{ needs.setup.outputs.repo_name }}
+      IMAGE: ${{ needs.setup.outputs.image }}
       RELEASE_AREA: ${{ needs.setup.outputs.release_area }}
 
     steps:
@@ -144,12 +145,13 @@ jobs:
       with:
         repository: ${{ inputs.repository }}
         path:       ${{ env.REPO }}
+        ref:        ${{ env.CALLER_BRANCH }}
 
     - name: Generate dbt wrapper script
       run: |
         cat << 'EOF' > dbt_wrapper.sh
         #!/bin/bash
-        set -euo pipefail
+        set -eo pipefail
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
         cd /ghw/dev-${{ matrix.os_name }}
@@ -167,11 +169,6 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        BRANCH="$CALLER_BRANCH"
-
-        cat << EOF > setup_build_area.sh
-        #!/bin/bash
-
         set -eo pipefail
 
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
@@ -181,27 +178,24 @@ jobs:
         release_name=$( ls -tr "$RELEASE_AREA" | grep fddaq | tail -1 )
 
         if [[ -z "$release_name" ]]; then
-          echo "Failed to find a release name in image ${{ matrix.image }}"
+          echo "Failed to find a release name in image $IMAGE"
           echo "under $RELEASE_AREA"
           exit 1
         fi
 
-        # Need the -s flag to avoid permission issues with /.spack when running
-        # inside a container as a non-root user
-        dbt-create -s ${{ needs.setup.outputs.dbt_args }} \
-                      $release_name \
-                      dev-${{ matrix.os_name }} || exit 11
+        dbt-create ${{ needs.setup.outputs.dbt_args }} \
+                   $release_name \
+                   dev-${{ matrix.os_name }} || exit 11
         cd dev-${{ matrix.os_name }}
         source env.sh
 
         cd sourcecode
 
         if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
-          cp -pr /ghw/$REPO .
+          cp -pr $GITHUB_WORKSPACE/$REPO .
         else   # Someone opened a PR
-          export GITHUB_TOKEN=$GITHUB_TOKEN
-          /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group coredaq
-          /ghw/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group fddaq
+          $GITHUB_WORKSPACE/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group coredaq
+          $GITHUB_WORKSPACE/daq-release/scripts/clone_all_packages_with_branch.py --branch $CALLER_BRANCH --package-group fddaq
         fi
 
         if [[ -d "./dbe" ]]; then
@@ -210,16 +204,6 @@ jobs:
 
         dbt-workarea-env
         dbt-build
-        EOF
-
-        chmod +x setup_build_area.sh
-        cat setup_build_area.sh
-
-        docker run --rm \
-          -v "${GITHUB_WORKSPACE}:/ghw" \
-          -w /ghw \
-          ${{ matrix.image }} \
-          /ghw/setup_build_area.sh
 
     - name: upload build log file
       uses: actions/upload-artifact@v7
@@ -227,18 +211,55 @@ jobs:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
 
+    - name: Install zstd
+      run: dnf install -y --disablerepo=epel zstd
+
+    - name: Create work area tarball
+      run: tar --zstd -cf dev-${{matrix.os_name }}.tar.zst dev-${{ matrix.os_name }} dbt_wrapper.sh
+
+    - name: Upload work area tarball as artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: build_area_${{ matrix.os_name }}
+        path: /tmp/nightly.tar.zst
+        # Default compression level is 6, which is redundant since we already compressed with zstd
+        compression-level: 0
+        retention-days: 7
+
+  unit_tests:
+    needs: create_build_area
+    name: run_unit_tests
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.setup.outputs.image }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        include:
+          - os_name: "a9"
+    env:
+      REPO: ${{ needs.setup.outputs.repo_name }}
+      IMAGE: ${{ needs.setup.outputs.image }}
+      RELEASE_AREA: ${{ needs.setup.outputs.release_area }}
+
+    steps:
+    - name: Download work area artifact
+      uses: actions/download-artifact@v8
+      with:
+        name: build_area_${{ matrix.os_name }}
+
+    - name: Install zstd and unpack work area
+      shell: bash
+      run: |
+        dnf install -y --disablerepo=epel zstd
+        tar --zstd -xf build_area_${{ matrix.os_name }}
+
     - name: Run unit tests
       run: |
-        # The USER environment variable needs to be set for
-        # hdf5libs unit tests to pass
-        docker run --rm \
-          --user $(id -u):$(id -g) \
-          -v /cvmfs:/cvmfs:shared \
-          -v "${GITHUB_WORKSPACE}:/ghw" \
-          -e USER=dunedaq \
-          -w /ghw \
-          ${{ matrix.image }} \
-          /ghw/dbt_wrapper.sh dbt-build --unittest $REPO
+        ./dbt_wrapper.sh
+        dbt-build --unittest
 
     - name: Get unit test summary path
       id: unit_test_summary
@@ -318,7 +339,7 @@ jobs:
 
   compare_linting_results:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
-    needs: [setup, Build_against_dev_release]
+    needs: [setup, create_build_area]
     runs-on: ubuntu-latest
     env:
       REPO: ${{ needs.setup.outputs.repo_name }}
