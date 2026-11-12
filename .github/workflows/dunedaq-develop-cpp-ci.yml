@@ -154,7 +154,7 @@ jobs:
         set -eo pipefail
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
-        cd /ghw/dev-${{ matrix.os_name }}
+        cd dev-${{ matrix.os_name }}
         source env.sh
         if [[ -d "sourcecode/dbe" ]]; then
           spack load dbe
