@@ -254,6 +254,8 @@ jobs:
       shell: bash
       run: |
         dnf install -y --disablerepo=epel zstd
+        ls -lrt
+        find . -name build_area_${{ matrix.os_name }}
         tar --zstd -xf build_area_${{ matrix.os_name }}
 
     - name: Run unit tests
