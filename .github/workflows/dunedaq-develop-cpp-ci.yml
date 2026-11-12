@@ -211,11 +211,10 @@ jobs:
         name: build_log_${{ matrix.os_name }}
         path: ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/build*.log
 
-    - name: Install zstd
-      run: dnf install -y --disablerepo=epel zstd
-
-    - name: Create work area tarball
-      run: tar --zstd -cf dev-${{matrix.os_name }}.tar.zst dev-${{ matrix.os_name }} dbt_wrapper.sh
+    - name: Install zstd and create work area tarball
+      run: |
+        dnf install -y --disablerepo=epel zstd
+        tar --zstd -cf dev-${{matrix.os_name }}.tar.zst dev-${{ matrix.os_name }} dbt_wrapper.sh daq-release
 
     - name: Upload work area tarball as artifact
       uses: actions/upload-artifact@v7
