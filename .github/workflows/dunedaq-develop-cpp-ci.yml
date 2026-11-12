@@ -272,15 +272,86 @@ jobs:
         name: unit_test_summary
         path: ${{ steps.unit_test_summary.outputs.summary_file_path }}
 
+  clang_formatting:
+    needs: [setup, create_build_area]
+    name: run_clang_formatting
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.setup.outputs.image }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        include:
+          - os_name: "a9"
+    env:
+      REPO: ${{ needs.setup.outputs.repo_name }}
+      IMAGE: ${{ needs.setup.outputs.image }}
+      RELEASE_AREA: ${{ needs.setup.outputs.release_area }}
+
+    steps:
+    - name: Download work area artifact
+      uses: actions/download-artifact@v8
+      with:
+        name: build_area_${{ matrix.os_name }}
+
+    - name: Install zstd and unpack work area
+      run: |
+        dnf install -y --disablerepo=epel zstd
+        tar --zstd -xf dev-${{matrix.os_name }}.tar.zst
+
+    - name: Run clang formatting
+      run: |
+        ./dbt_wrapper.sh dbt-clang-format.sh sourcecode/$REPO --view-differences-only --markdown-summary
+
+    - name: Get clang format summary path
+      id: clang_format_summary
+      run: |
+        file_path=$(find . -name clang_format_summary_table.md -type f)
+        cat "$file_path" >> $GITHUB_STEP_SUMMARY
+        echo "file_path=$file_path" >> "$GITHUB_OUTPUT"
+        cat "$GITHUB_OUTPUT"
+  
+    - name: upload clang format summary file
+      uses: actions/upload-artifact@v7
+      with:
+        if-no-files-found: error
+        name: clang_format_summary
+        path: ${{ steps.clang_format_summary.outputs.file_path }}
+
+  linting:
+    needs: [setup, create_build_area]
+    name: run_linting
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.setup.outputs.image }}
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        include:
+          - os_name: "a9"
+    env:
+      REPO: ${{ needs.setup.outputs.repo_name }}
+      IMAGE: ${{ needs.setup.outputs.image }}
+      RELEASE_AREA: ${{ needs.setup.outputs.release_area }}
+
+    steps:
+    - name: Download work area artifact
+      uses: actions/download-artifact@v8
+      with:
+        name: build_area_${{ matrix.os_name }}
+
+    - name: Install zstd and unpack work area
+      run: |
+        dnf install -y --disablerepo=epel zstd
+        tar --zstd -xf dev-${{matrix.os_name }}.tar.zst
+
     - name: Run linting
       run: |
-        docker run --rm \
-          --user $(id -u):$(id -g) \
-          -v /cvmfs:/cvmfs:shared \
-          -v "${GITHUB_WORKSPACE}:/ghw" \
-          -w /ghw \
-          ${{ matrix.image }} \
-          /ghw/dbt_wrapper.sh dbt-build --lint $REPO
+        ./dbt_wrapper.sh dbt-build --lint $REPO
 
     - name: set linting artifact name
       id: set_artifact_name
@@ -307,32 +378,6 @@ jobs:
         name: ${{ steps.set_artifact_name.outputs.linting_artifact_name }}
         path: ${{ steps.set_artifact_name.outputs.linting_file_path }}
 
-    - name: Run clang formatting
-      id: clang_format
-      run: |
-        docker run --rm \
-          -v /cvmfs:/cvmfs:shared \
-          -v "${GITHUB_WORKSPACE}:/ghw" \
-          -e USER=dunedaq \
-          -w /ghw \
-          ${{ matrix.image }} \
-          /ghw/dbt_wrapper.sh \
-          dbt-clang-format.sh sourcecode/$REPO --view-differences-only --markdown-summary
-
-    - name: Get unit test summary path
-      id: clang_format_summary
-      run: |
-        file_path=$(find . -name clang_format_summary_table.md -type f)
-        cat "$file_path" >> $GITHUB_STEP_SUMMARY
-        echo "file_path=$file_path" >> "$GITHUB_OUTPUT"
-        cat "$GITHUB_OUTPUT"
-  
-    - name: upload clang format summary file
-      uses: actions/upload-artifact@v7
-      with:
-        if-no-files-found: error
-        name: clang_format_summary
-        path: ${{ steps.clang_format_summary.outputs.file_path }}
 
   compare_linting_results:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
