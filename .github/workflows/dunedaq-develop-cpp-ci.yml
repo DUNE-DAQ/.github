@@ -194,6 +194,15 @@ jobs:
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
 
+        # The relevant release should be the only one available in the container
+        release_name=$( ls -tr "$RELEASE_AREA" | grep fddaq | tail -1 )
+
+        if [[ -z "$release_name" ]]; then
+          echo "Failed to find a release name in image ${{ matrix.image }}"
+          echo "under $RELEASE_AREA"
+          exit 1
+        fi
+
         # Need the -s flag to avoid permission issues with /.spack when running
         # inside a container as a non-root user
         dbt-create -s ${{ needs.setup.outputs.dbt_args }} \
