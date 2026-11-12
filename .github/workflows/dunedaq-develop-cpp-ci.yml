@@ -121,11 +121,7 @@ jobs:
           cat "$GITHUB_OUTPUT"
 
   Build_against_dev_release:
-<<<<<<< HEAD
-    needs: release_info
-=======
-    needs: [Should_run, Determine_image]
->>>>>>> e2e4f9a036a261a9506eb2c37270ae37fd18dc44
+    needs: [Should_run, release_info]
     name: build_against_dev_on_${{ matrix.os_name }}
     runs-on: ubuntu-latest
     strategy:
