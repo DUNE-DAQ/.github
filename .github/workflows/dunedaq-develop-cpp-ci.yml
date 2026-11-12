@@ -119,17 +119,18 @@ jobs:
     if: ${{ needs.setup.outputs.should_run == 'true' }}
     name: build_against_dev_on_${{ matrix.os_name }}
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - image: ${{ needs.setup.outputs.image }}
-            os_name: "a9"
-    env:
-      REPO: ${{ needs.setup.outputs.repo_name }}
-      RELEASE_AREA: ${{ needs.setup.outputs.release_area }}
+    container:
+      image: ${{ needs.setup.outputs.image }}
     defaults:
       run:
         shell: bash
+    strategy:
+      matrix:
+        include:
+          - os_name: "a9"
+    env:
+      REPO: ${{ needs.setup.outputs.repo_name }}
+      RELEASE_AREA: ${{ needs.setup.outputs.release_area }}
 
     steps:
     - name: Checkout daq-release
@@ -137,9 +138,6 @@ jobs:
       with:
         repository: DUNE-DAQ/daq-release
         path: daq-release
-
-    - name: Pull build image
-      run: docker pull ${{ matrix.image }}
 
     - name: checkout package for CI
       uses: actions/checkout@v7
@@ -151,11 +149,12 @@ jobs:
       run: |
         cat << 'EOF' > dbt_wrapper.sh
         #!/bin/bash
+        set -euo pipefail
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
         cd /ghw/dev-${{ matrix.os_name }}
         source env.sh
-        if [[ -d ".sourcecode/dbe" ]]; then
+        if [[ -d "sourcecode/dbe" ]]; then
           spack load dbe
         fi
         exec "$@"
