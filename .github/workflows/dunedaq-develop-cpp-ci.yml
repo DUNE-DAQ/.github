@@ -138,10 +138,6 @@ jobs:
         repository: DUNE-DAQ/daq-release
         path: daq-release
 
-    - name: Make workspace writeable for container user
-      run: |
-        chmod -R o+w "${GITHUB_WORKSPACE}"
-
     - name: Pull build image
       run: docker pull ${{ matrix.image }}
 
@@ -221,7 +217,6 @@ jobs:
         cat setup_build_area.sh
 
         docker run --rm \
-          --user $(id -u):$(id -g) \
           -v "${GITHUB_WORKSPACE}:/ghw" \
           -w /ghw \
           ${{ matrix.image }} \
