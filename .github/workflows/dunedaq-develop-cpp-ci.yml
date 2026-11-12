@@ -251,16 +251,13 @@ jobs:
         name: build_area_${{ matrix.os_name }}
 
     - name: Install zstd and unpack work area
-      shell: bash
       run: |
         dnf install -y --disablerepo=epel zstd
-        ls -lrt
         tar --zstd -xf dev-${{matrix.os_name }}.tar.zst
 
     - name: Run unit tests
       run: |
-        ./dbt_wrapper.sh
-        dbt-build --unittest
+        ./dbt_wrapper.sh dbt-build --unittest
 
     - name: Get unit test summary path
       id: unit_test_summary
