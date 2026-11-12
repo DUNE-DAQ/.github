@@ -221,7 +221,7 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         name: build_area_${{ matrix.os_name }}
-        path: /tmp/nightly.tar.zst
+        path: dev-${{ matrix.os_name }}.tar.zst
         # Default compression level is 6, which is redundant since we already compressed with zstd
         compression-level: 0
         retention-days: 7
