@@ -300,7 +300,6 @@ jobs:
 
     - name: Install zstd and unpack work area
       run: |
-        dnf install -y --disablerepo=epel zstd
         tar --zstd -xf dev-${{matrix.os_name }}.tar.zst
 
     - name: Pull docker image
