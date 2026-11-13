@@ -291,6 +291,10 @@ jobs:
       RELEASE_AREA: ${{ needs.setup.outputs.release_area }}
 
     steps:
+    - uses: cvmfs-contrib/github-action-cvmfs@72f2a8d366043978d6aebee154bc9ed321c2f2a8
+      with:
+        cvmfs_repositories: 'dunedaq-development.opensciencegrid.org'
+
     - name: Download work area artifact
       uses: actions/download-artifact@v8
       with:
@@ -339,6 +343,10 @@ jobs:
       RELEASE_AREA: ${{ needs.setup.outputs.release_area }}
 
     steps:
+    - uses: cvmfs-contrib/github-action-cvmfs@72f2a8d366043978d6aebee154bc9ed321c2f2a8
+      with:
+        cvmfs_repositories: 'dunedaq-development.opensciencegrid.org'
+
     - name: Download work area artifact
       uses: actions/download-artifact@v8
       with:
@@ -381,7 +389,7 @@ jobs:
 
   compare_linting_results:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
-    needs: [setup, create_build_area]
+    needs: [setup, create_build_area, linting]
     runs-on: ubuntu-latest
     env:
       REPO: ${{ needs.setup.outputs.repo_name }}
