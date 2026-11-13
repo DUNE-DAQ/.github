@@ -308,7 +308,6 @@ jobs:
 
     - name: Run clang formatting
       run: |
-        ./dbt_wrapper.sh dbt-clang-format.sh sourcecode/$REPO --view-differences-only --markdown-summary
         docker run --rm \
           --user $(id -u):$(id -g) \
           -v /cvmfs:/cvmfs:shared \
@@ -336,8 +335,6 @@ jobs:
     needs: [setup, create_build_area]
     name: run_linting
     runs-on: ubuntu-latest
-    container:
-      image: ${{ needs.setup.outputs.image }}
     defaults:
       run:
         shell: bash
@@ -362,12 +359,18 @@ jobs:
 
     - name: Install zstd and unpack work area
       run: |
-        dnf install -y --disablerepo=epel zstd
         tar --zstd -xf dev-${{matrix.os_name }}.tar.zst
 
     - name: Run linting
       run: |
         ./dbt_wrapper.sh dbt-build --lint $REPO
+        docker run --rm \
+          --user $(id -u):$(id -g) \
+          -v /cvmfs:/cvmfs:shared \
+          -v "${GITHUB_WORKSPACE}:/ghw" \
+          -w /ghw \
+          $IMAGE \
+          /ghw/dbt_wrapper.sh dbt-build --lint $REPO
 
     - name: set linting artifact name
       id: set_artifact_name
