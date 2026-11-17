@@ -184,7 +184,7 @@ jobs:
 
         dbt-create ${{ env.DBT_ARGS }} \
                    ${{ env.RELEASE_NAME }} \
-                   "dev-${{ matrix.os_name }}"" || exit 11
+                   dev-${{ matrix.os_name }} || exit 11
         cd dev-${{ matrix.os_name }}
         source env.sh
         cd sourcecode
