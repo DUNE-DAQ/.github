@@ -178,6 +178,8 @@ jobs:
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
         echo "RELEASE_AREA: $RELEASE_AREA"
+        echo "ls -tr RELEASE_AREA:"
+        ls -tr ${{ env.RELEASE_AREA }}
         RELEASE_NAME="$( ls -tr ${{ env.RELEASE_AREA }} | grep fddaq | tail -1 )"
         echo "RELEASE_NAME: $RELEASE_NAME"
         echo "DBT_ARGS: ${{ env.DBT_ARGS }}"
