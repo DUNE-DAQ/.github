@@ -53,8 +53,12 @@ jobs:
       repo_name: ${{ steps.set_repo_name.outputs.repo_name }}
       image: ${{ steps.get_release_info.outputs.image }}
       dbt_args: ${{ steps.get_release_info.outputs.dbt_args }}
-      release_area: ${{ steps.get_release_info.outputs.release_area }}
+      release_name: ${{ steps.get_release_info.outputs.release_name }}
     steps:
+      - uses: cvmfs-contrib/github-action-cvmfs@72f2a8d366043978d6aebee154bc9ed321c2f2a8
+        with:
+          cvmfs_repositories: 'dunedaq-development.opensciencegrid.org'
+
       - id: set_repo_name
         run: |
           # e.g., "DUNE-DAQ/hdf5libs" -> "hdf5libs"
@@ -96,20 +100,20 @@ jobs:
             prep-release/*)
               image="ghcr.io/dune-daq/candidate-release-alma9:latest"
               dbt_args="-b candidate"
-              release_area=/cvmfs/dunedaq-development.opensciencegrid.org/candidates/ ;;
+              release_name="$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/candidates/ | grep fddaq | tail -1 )" ;;
             patch/*)
               image="ghcr.io/dune-daq/stable-release-alma9:latest"
               dbt_args=""
-              release_area=/cvmfs/dunedaq.opensciencegrid.org/spack/releases/ ;;
+              release_name="$( ls -tr /cvmfs/dunedaq.opensciencegrid.org/spack/releases/ | grep fddaq | tail -1 )" ;;
             *)
               image="ghcr.io/dune-daq/nightly-release-alma9:development_v5"
               dbt_args="-n"
-              release_area=/cvmfs/dunedaq-development.opensciencegrid.org/nightly/ ;;
+              release_name="$( ls -tr /cvmfs/dunedaq.opensciencegrid.org/nightly/ | grep fddaq | tail -1 )" ;;
           esac
           {
             echo "image=$image"
             echo "dbt_args=$dbt_args"
-            echo "release_area=$release_area"
+            echo "release_name=$release_name"
           } >> "$GITHUB_OUTPUT"
 
           cat "$GITHUB_OUTPUT"
@@ -130,7 +134,7 @@ jobs:
       REPO: ${{ needs.setup.outputs.repo_name }}
       DBT_ARGS: ${{ needs.setup.outputs.dbt_args }}
       IMAGE: ${{ needs.setup.outputs.image }}
-      RELEASE_AREA: ${{ needs.setup.outputs.release_area }}
+      RELEASE_NAME: ${{ needs.setup.outputs.release_name }}
 
     steps:
     - name: Checkout daq-release
@@ -177,16 +181,10 @@ jobs:
         set -eo pipefail
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
-        echo "RELEASE_AREA: $RELEASE_AREA"
-        echo "ls -tr RELEASE_AREA:"
-        ls -tr ${{ env.RELEASE_AREA }}
-        RELEASE_NAME="$( ls -tr ${{ env.RELEASE_AREA }} | grep fddaq | tail -1 )"
-        echo "RELEASE_NAME: $RELEASE_NAME"
-        echo "DBT_ARGS: ${{ env.DBT_ARGS }}"
 
         dbt-create ${{ env.DBT_ARGS }} \
-                   $RELEASE_NAME \
-                   dev-${{ matrix.os_name }} || exit 11
+                   ${{ env.RELEASE_NAME }} \
+                   "dev-${{ matrix.os_name }}"" || exit 11
         cd dev-${{ matrix.os_name }}
         source env.sh
         cd sourcecode
