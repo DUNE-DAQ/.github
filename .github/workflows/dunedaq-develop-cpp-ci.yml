@@ -177,9 +177,12 @@ jobs:
         set -eo pipefail
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
-        RELEASE_NAME="$( ls -tr $RELEASE_AREA | grep fddaq | tail -1 )"
+        echo "RELEASE_AREA: $RELEASE_AREA"
+        RELEASE_NAME="$( ls -tr ${{ env.RELEASE_AREA }} | grep fddaq | tail -1 )"
+        echo "RELEASE_NAME: $RELEASE_NAME"
+        echo "DBT_ARGS: ${{ env.DBT_ARGS }}"
 
-        dbt-create $DBT_ARGS \
+        dbt-create ${{ env.DBT_ARGS }} \
                    $RELEASE_NAME \
                    dev-${{ matrix.os_name }} || exit 11
         cd dev-${{ matrix.os_name }}
