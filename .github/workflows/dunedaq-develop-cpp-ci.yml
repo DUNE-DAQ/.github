@@ -57,7 +57,7 @@ jobs:
     steps:
       - uses: cvmfs-contrib/github-action-cvmfs@72f2a8d366043978d6aebee154bc9ed321c2f2a8
         with:
-          cvmfs_repositories: 'dunedaq-development.opensciencegrid.org'
+          cvmfs_repositories: 'dunedaq.opensciencegrid.org,dunedaq-development.opensciencegrid.org'
 
       - id: set_repo_name
         run: |
@@ -108,7 +108,7 @@ jobs:
             *)
               image="ghcr.io/dune-daq/nightly-release-alma9:development_v5"
               dbt_args="-n"
-              release_name="$( ls -tr /cvmfs/dunedaq.opensciencegrid.org/nightly/ | grep fddaq | tail -1 )" ;;
+              release_name="$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/nightly/ | grep fddaq | tail -1 )" ;;
           esac
           {
             echo "image=$image"
