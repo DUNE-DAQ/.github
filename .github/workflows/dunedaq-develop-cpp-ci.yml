@@ -234,6 +234,31 @@ jobs:
         compression-level: 0
         retention-days: 7
 
+    - name: Run clang formatting
+      run: |
+        docker run --rm \
+          -v /cvmfs:/cvmfs:shared \
+          -v "${GITHUB_WORKSPACE}:/ghw" \
+          -w /ghw \
+          $IMAGE \
+          /ghw/dbt_wrapper.sh dbt-clang-format.sh sourcecode/$REPO --view-differences-only --markdown-summary
+          #--user $(id -u):$(id -g) \
+
+    - name: Get clang format summary path
+      id: clang_format_summary
+      run: |
+        file_path=$(find . -name clang_format_summary_table.md -type f)
+        cat "$file_path" >> $GITHUB_STEP_SUMMARY
+        echo "file_path=$file_path" >> "$GITHUB_OUTPUT"
+        cat "$GITHUB_OUTPUT"
+  
+    - name: upload clang format summary file
+      uses: actions/upload-artifact@v7
+      with:
+        if-no-files-found: error
+        name: clang_format_summary_${{ matrix.os_name }}
+        path: ${{ steps.clang_format_summary.outputs.file_path }}
+
   unit_tests:
     needs: [setup, build_and_run_tests]
     name: run_unit_tests
@@ -291,30 +316,6 @@ jobs:
         name: unit_test_summary
         path: ${{ steps.unit_test_summary.outputs.summary_file_path }}
 
-    - name: Run clang formatting
-      run: |
-        docker run --rm \
-          -v /cvmfs:/cvmfs:shared \
-          -v "${GITHUB_WORKSPACE}:/ghw" \
-          -w /ghw \
-          $IMAGE \
-          /ghw/dbt_wrapper.sh dbt-clang-format.sh sourcecode/$REPO --view-differences-only --markdown-summary
-          #--user $(id -u):$(id -g) \
-
-    - name: Get clang format summary path
-      id: clang_format_summary
-      run: |
-        file_path=$(find . -name clang_format_summary_table.md -type f)
-        cat "$file_path" >> $GITHUB_STEP_SUMMARY
-        echo "file_path=$file_path" >> "$GITHUB_OUTPUT"
-        cat "$GITHUB_OUTPUT"
-  
-    - name: upload clang format summary file
-      uses: actions/upload-artifact@v7
-      with:
-        if-no-files-found: error
-        name: clang_format_summary_${{ matrix.os_name }}
-        path: ${{ steps.clang_format_summary.outputs.file_path }}
 
   report_clang_formatting:
     needs: [setup, build_and_run_tests]
