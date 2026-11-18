@@ -118,7 +118,7 @@ jobs:
 
           cat "$GITHUB_OUTPUT"
 
-  create_build_area:
+  build_and_run_tests:
     needs: setup
     if: ${{ needs.setup.outputs.should_run == 'true' }}
     name: create_dev_area_on_${{ matrix.os_name }}
@@ -235,7 +235,7 @@ jobs:
         retention-days: 7
 
   unit_tests:
-    needs: [setup, create_build_area]
+    needs: [setup, build_and_run_tests]
     name: run_unit_tests
     runs-on: ubuntu-latest
     defaults:
@@ -291,39 +291,6 @@ jobs:
         name: unit_test_summary
         path: ${{ steps.unit_test_summary.outputs.summary_file_path }}
 
-  clang_formatting:
-    needs: [setup, create_build_area]
-    name: run_clang_formatting
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        shell: bash
-    strategy:
-      matrix:
-        include:
-          - os_name: "a9"
-    env:
-      REPO: ${{ needs.setup.outputs.repo_name }}
-      IMAGE: ${{ needs.setup.outputs.image }}
-
-    steps:
-    - uses: cvmfs-contrib/github-action-cvmfs@72f2a8d366043978d6aebee154bc9ed321c2f2a8
-      with:
-        cvmfs_repositories: 'dunedaq-development.opensciencegrid.org'
-
-    - name: Download work area artifact
-      uses: actions/download-artifact@v8
-      with:
-        name: build_area_${{ matrix.os_name }}
-
-    - name: Unpack work area
-      run: |
-        tar --zstd -xf dev-${{matrix.os_name }}.tar.zst
-
-    - name: Pull docker image
-      run: |
-        docker pull $IMAGE
-
     - name: Run clang formatting
       run: |
         docker run --rm \
@@ -346,11 +313,39 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         if-no-files-found: error
-        name: clang_format_summary
+        name: clang_format_summary_${{ matrix.os_name }}
         path: ${{ steps.clang_format_summary.outputs.file_path }}
 
+  report_clang_formatting:
+    needs: [setup, build_and_run_tests]
+    name: report_clang_formatting
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        include:
+          - os_name: "a9"
+
+    steps:
+    - name: Download clang formatting report
+      uses: actions/download-artifact@v8
+      with:
+        name: clang_format_summary
+
+    - name: Check clang formatting report
+      run: |
+        ls -lrt
+        find . -name clang_format_summary_table.md
+        if grep "Needs formatting" clang_format_summary/clang_format_summary_table.md >/dev/null; then 
+          echo "One or more files need clang formatting"
+          exit 1
+        fi
+
+
   linting:
-    needs: [setup, create_build_area]
+    needs: [setup, build_and_run_tests]
     name: run_linting
     runs-on: ubuntu-latest
     defaults:
@@ -420,7 +415,7 @@ jobs:
 
   compare_linting_results:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
-    needs: [setup, create_build_area, linting]
+    needs: [setup, build_and_run_tests, linting]
     runs-on: ubuntu-latest
     env:
       REPO: ${{ needs.setup.outputs.repo_name }}
