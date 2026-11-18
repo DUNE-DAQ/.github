@@ -332,7 +332,7 @@ jobs:
     - name: Download clang formatting report
       uses: actions/download-artifact@v8
       with:
-        name: clang_format_summary
+        name: clang_format_summary_${{ matrix.os_name }}
 
     - name: Check clang formatting report
       run: |
