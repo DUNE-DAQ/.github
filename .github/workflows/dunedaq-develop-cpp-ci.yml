@@ -337,9 +337,14 @@ jobs:
 
     - name: Check clang formatting report
       run: |
-        ls -lrt
-        find . -name clang_format_summary_table.md
-        if grep "Needs formatting" clang_format_summary/clang_format_summary_table.md >/dev/null; then 
+        clang_summary_file="clang_format_summary_table.md"
+        if [[ ! -f "$clang_summary_file" ]]; then
+          echo "ERROR: No file named $clang_summary_file found"
+          exit 1
+        fi
+        cat "$clang_summary_file" >> $GITHUB_STEP_SUMMARY
+
+        if grep "Needs formatting" "$clang_summary_file" >/dev/null; then 
           echo "One or more files need clang formatting"
           exit 1
         fi
