@@ -319,7 +319,7 @@ jobs:
     - name: Download unit test report
       uses: actions/download-artifact@v8
       with:
-        name: unit_test_summary_${{ matrix.os_name }}
+        name: unit_test_summary
 
     - name: Checkout daq-release
       uses: actions/checkout@v7
@@ -355,7 +355,7 @@ jobs:
     - name: Download clang formatting report
       uses: actions/download-artifact@v8
       with:
-        name: clang_format_summary_${{ matrix.os_name }}
+        name: clang_format_summary
 
     - name: Check clang formatting report
       run: |
