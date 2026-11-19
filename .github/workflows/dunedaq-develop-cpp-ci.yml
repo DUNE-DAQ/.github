@@ -502,13 +502,11 @@ jobs:
           --github-token ${{ env.GITHUB_TOKEN }}
           .
 
-
     - name: Upload link checker log
       uses: actions/upload-artifact@v7
       with:
         name: link_checker_log
         path: ./lychee/out.md
-
 
     - name: Raise links errors
       run: |
