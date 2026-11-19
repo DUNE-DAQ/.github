@@ -363,7 +363,7 @@ jobs:
         fi
         cat "$clang_summary_file" >> $GITHUB_STEP_SUMMARY
 
-        if grep -q "Needs formatting" "$clang_summary_file"; then 
+        if grep -q "Needs formatting" "$clang_summary_file"; then
           echo "One or more files need clang formatting"
           exit 1
         fi
