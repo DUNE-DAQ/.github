@@ -505,9 +505,11 @@ jobs:
 
     - name: Raise links errors
       run: |
-        cat lychee/out.md
-        if grep -q -e "Errors" -e "Unknown" lychee/out.md; then
-          echo "ERROR: Broken links found. See the report on this run's summary page:"
+        num_errors=$(awk -F'|' '/Errors/ {gsub(/ /, "", $3); print $3}' lychee/out.md)
+        num_unknown=$(awk -F'|' '/Unknown/ {gsub(/ /, "", $3); print $3}' lychee/out.md)
+
+        if (( ${num_errors:-0} > 0 || ${num_unknown:-0} > 0 )); then
+          echo "::error::Found $num_errors broken and $num_unknown unknown links. See this run's summary page:"
           echo "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           exit 1
         fi
