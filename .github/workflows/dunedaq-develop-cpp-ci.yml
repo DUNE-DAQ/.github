@@ -45,6 +45,7 @@ env:
   CALLER_BRANCH: ${{ inputs.caller_branch || github.head_ref || github.ref_name }}
   TARGET_BRANCH: ${{ inputs.target_branch || github.base_ref || github.ref_name }}
 
+
 jobs:
   setup:
     runs-on: ubuntu-latest
@@ -117,6 +118,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
           cat "$GITHUB_OUTPUT"
+
 
   build_and_run_tests:
     needs: setup
@@ -301,6 +303,7 @@ jobs:
         name: ${{ steps.set_artifact_name.outputs.linting_artifact_name }}
         path: ${{ steps.set_artifact_name.outputs.linting_file_path }}
 
+
   report_unit_tests_results:
     needs: [setup, build_and_run_tests]
     name: report_unit_tests
@@ -469,6 +472,7 @@ jobs:
         name: linting_diff
         path: ${{ steps.compare.outputs.diff_file_name }}
 
+
   check_docs_links:
     runs-on: ubuntu-latest
     defaults:
@@ -479,6 +483,7 @@ jobs:
       with:
         repository: ${{ inputs.repository }}
         ref:        ${{ env.CALLER_BRANCH }}
+
     - name: Check links
       uses: lycheeverse/lychee-action@649b0e4890508ea3e11ea6b3ee35ce899a25afd5
       env:
@@ -497,11 +502,13 @@ jobs:
           --github-token ${{ env.GITHUB_TOKEN }}
           .
 
+
     - name: Upload link checker log
       uses: actions/upload-artifact@v7
       with:
         name: link_checker_log
         path: ./lychee/out.md
+
 
     - name: Raise links errors
       run: |
