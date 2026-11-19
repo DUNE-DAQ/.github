@@ -1,4 +1,18 @@
 name: Single-Package CI Build and Tests
+description: >-
+  CI build and tests for C++ DUNE DAQ packages.
+
+  All checks are run in one job with separate reporting jobs. This avoids
+  repeated 'docker pull' calls which can take several minutes, while allowing
+  for individual checks to appear in the GitHub output. Each check
+  runs in an image spun off the latest container of the appropriate type
+  (stable, candidate, or nightly). This image includes a CVMFS "mirror," but
+  we also need to volume mount the "real" CVMFS so that the linting and clang
+  formatting checks can access llvm, which is not included in the container.
+
+  The reporting jobs raise errors if there were issues in the checks. The linting
+  report is only run on pull requests, where the results of linting on the pull
+  request code are compared to that of the most recent scheduled CI check.
 
 permissions:
   contents: read
