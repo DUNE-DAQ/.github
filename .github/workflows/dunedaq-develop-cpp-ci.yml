@@ -240,7 +240,7 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         if-no-files-found: error
-        name: unit_test_summary_${{ matrix.os_name }}
+        name: unit_test_summary
         path: ${{ steps.unit_test_summary.outputs.summary_file_path }}
 
     - name: Run clang formatting
@@ -264,7 +264,7 @@ jobs:
       uses: actions/upload-artifact@v7
       with:
         if-no-files-found: error
-        name: clang_format_summary_${{ matrix.os_name }}
+        name: clang_format_summary
         path: ${{ steps.clang_format_summary.outputs.file_path }}
 
     - name: Run linting
