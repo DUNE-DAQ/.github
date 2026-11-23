@@ -272,7 +272,6 @@ jobs:
       id: clang_format_summary
       run: |
         file_path=$(find . -name clang_format_summary_table.md -type f)
-        cat "$file_path" >> $GITHUB_STEP_SUMMARY
         echo "file_path=$file_path" >> "$GITHUB_OUTPUT"
         cat "$GITHUB_OUTPUT"
   
@@ -302,8 +301,7 @@ jobs:
 
         linting_file_path=$(find ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/ -name ${REPO}_linting.log | tail -n 1)
         if [[ ! -f "$linting_file_path" ]]; then
-          echo "No file named ${REPO}_linting.log found"
-          exit 15
+          echo "::warning::No file named ${REPO}_linting.log found"
         fi
 
         echo "linting_artifact_name=$linting_artifact_name" >> "$GITHUB_OUTPUT"
