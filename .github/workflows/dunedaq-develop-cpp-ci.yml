@@ -239,6 +239,7 @@ jobs:
     - name: Run unit tests
       run: |
         docker run --rm \
+          -e USER=$(whoami) \
           -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
           -w /ghw \
