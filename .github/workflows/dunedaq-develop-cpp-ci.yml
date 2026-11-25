@@ -489,6 +489,7 @@ jobs:
 
   check_docs_links:
     runs-on: ubuntu-latest
+    name: Check docs links
     defaults:
       run:
         shell: bash
