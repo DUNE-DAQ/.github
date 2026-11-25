@@ -1,4 +1,18 @@
 name: Single-Package CI Build and Tests
+description: >-
+  CI build and tests for C++ DUNE DAQ packages.
+
+  All checks are run in one job with separate reporting jobs. This avoids
+  repeated 'docker pull' calls which can take several minutes, while allowing
+  for individual checks to appear in the GitHub output. Each check
+  runs in an image spun off the latest container of the appropriate type
+  (stable, candidate, or nightly). This image includes a CVMFS "mirror," but
+  we also need to volume mount the "real" CVMFS so that the linting and clang
+  formatting checks can access llvm, which is not included in the container.
+
+  The reporting jobs raise errors if there were issues in the checks. The linting
+  report is only run on pull requests, where the results of linting on the pull
+  request code are compared to that of the most recent scheduled CI check.
 
 permissions:
   contents: read
@@ -45,13 +59,21 @@ env:
   CALLER_BRANCH: ${{ inputs.caller_branch || github.head_ref || github.ref_name }}
   TARGET_BRANCH: ${{ inputs.target_branch || github.base_ref || github.ref_name }}
 
+
 jobs:
-  Should_run:
+  setup:
     runs-on: ubuntu-latest
     outputs:
       should_run: ${{ steps.check.outputs.should_run }}
       repo_name: ${{ steps.set_repo_name.outputs.repo_name }}
+      image: ${{ steps.get_release_info.outputs.image }}
+      dbt_args: ${{ steps.get_release_info.outputs.dbt_args }}
+      release_name: ${{ steps.get_release_info.outputs.release_name }}
     steps:
+      - uses: cvmfs-contrib/github-action-cvmfs@d705955b32075b4b0178f3a0160b6fe527483cf8
+        with:
+          cvmfs_repositories: 'dunedaq.opensciencegrid.org,dunedaq-development.opensciencegrid.org'
+
       - id: set_repo_name
         run: |
           # e.g., "DUNE-DAQ/hdf5libs" -> "hdf5libs"
@@ -63,6 +85,7 @@ jobs:
         with:
           repository: ${{ inputs.repository }}
           path:       ${{ steps.set_repo_name.outputs.repo_name }}
+          ref:        ${{ env.TARGET_BRANCH }}
 
       - id: check
         run: |
@@ -71,7 +94,6 @@ jobs:
           else
 
             cd $GITHUB_WORKSPACE/${{ steps.set_repo_name.outputs.repo_name }}
-            git checkout $TARGET_BRANCH
             commit_time=$( git log -1 --format=%ct )
             current_time=$( date +%s )
 
@@ -87,37 +109,48 @@ jobs:
             fi
           fi
 
-  Determine_image:
-    needs: Should_run
-    if: needs.Should_run.outputs.should_run == 'true'
-    runs-on: ubuntu-latest
-    outputs:
-      image: ${{ steps.set_image.outputs.image }}
-    steps:
-      - id: set_image
+      - id: get_release_info
         run: |
-          if [[ "$TARGET_BRANCH" =~ ^prep-release/.* ]]; then
-            echo "image=ghcr.io/dune-daq/candidate-release-alma9:latest" >> $GITHUB_OUTPUT
-          elif [[ "$TARGET_BRANCH" =~ ^patch/.* ]]; then
-            echo "image=ghcr.io/dune-daq/stable-release-alma9:latest" >> $GITHUB_OUTPUT
-          else
-            echo "image=ghcr.io/dune-daq/nightly-release-alma9:development_v5" >> $GITHUB_OUTPUT
-          fi
+          case "$TARGET_BRANCH" in
+            prep-release/*)
+              image="ghcr.io/dune-daq/candidate-release-alma9:latest"
+              dbt_args="-b candidate"
+              release_name="$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/candidates/ | grep fddaq | tail -1 )" ;;
+            patch/*)
+              image="ghcr.io/dune-daq/stable-release-alma9:latest"
+              dbt_args=""
+              release_name="$( ls -tr /cvmfs/dunedaq.opensciencegrid.org/spack/releases/ | grep fddaq | tail -1 )" ;;
+            *)
+              image="ghcr.io/dune-daq/nightly-release-alma9:development_v5"
+              dbt_args="-n"
+              release_name="$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/nightly/ | grep fddaq | tail -1 )" ;;
+          esac
+          {
+            echo "image=$image"
+            echo "dbt_args=$dbt_args"
+            echo "release_name=$release_name"
+          } >> "$GITHUB_OUTPUT"
 
-  Build_against_dev_release:
-    needs: [Should_run, Determine_image]
-    name: build_against_dev_on_${{ matrix.os_name }}
+          cat "$GITHUB_OUTPUT"
+
+
+  build_and_run_tests:
+    needs: setup
+    if: ${{ needs.setup.outputs.should_run == 'true' }}
+    name: Build
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - image: ${{ needs.determine_image.outputs.image }}
-            os_name: "a9"
-    env:
-      REPO: ${{ needs.Should_run.outputs.repo_name }}
     defaults:
       run:
         shell: bash
+    strategy:
+      matrix:
+        include:
+          - os_name: "a9"
+    env:
+      REPO: ${{ needs.setup.outputs.repo_name }}
+      DBT_ARGS: ${{ needs.setup.outputs.dbt_args }}
+      IMAGE: ${{ needs.setup.outputs.image }}
+      RELEASE_NAME: ${{ needs.setup.outputs.release_name }}
 
     steps:
     - name: Checkout daq-release
@@ -126,51 +159,27 @@ jobs:
         repository: DUNE-DAQ/daq-release
         path: daq-release
 
-    - uses: cvmfs-contrib/github-action-cvmfs@d705955b32075b4b0178f3a0160b6fe527483cf8
-      with:
-        cvmfs_repositories: 'dunedaq-development.opensciencegrid.org'
-
-    - name: Make workspace writeable for container user
-      run: |
-        chmod -R o+w "${GITHUB_WORKSPACE}"
-
-    - name: Pull build image
-      run: docker pull ${{ needs.determine_image.outputs.image }}
-        
-    - id: get_release_info
-      run: |
-          echo "Caller branch is " "$CALLER_BRANCH"
-          echo "Target branch is " "$TARGET_BRANCH"
-
-          extra_dbt_args=""
-          if [[ ${{ needs.determine_image.outputs.image }} =~ ^.*stable.* ]]; then
-            release_name=$( ls -tr /cvmfs/dunedaq.opensciencegrid.org/spack/releases/ | grep fddaq | tail -1 )
-          elif [[ ${{ needs.determine_image.outputs.image }} =~ ^.*candidate.* ]]; then
-            extra_dbt_args="-b candidate"
-            release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/candidates/ | grep fddaq | tail -1 )
-          else
-            extra_dbt_args="-n"
-            release_name=$( ls -tr /cvmfs/dunedaq-development.opensciencegrid.org/nightly/ | grep fddaq | tail -1 )
-          fi
-
-          echo "extra_dbt_args=$extra_dbt_args" >> "$GITHUB_OUTPUT"
-          echo "release_name=$release_name"     >> "$GITHUB_OUTPUT"
-
     - name: checkout package for CI
       uses: actions/checkout@v7
       with:
         repository: ${{ inputs.repository }}
         path:       ${{ env.REPO }}
+        ref:        ${{ env.CALLER_BRANCH }}
+
+    - uses: cvmfs-contrib/github-action-cvmfs@d705955b32075b4b0178f3a0160b6fe527483cf8
+      with:
+        cvmfs_repositories: 'dunedaq-development.opensciencegrid.org'
 
     - name: Generate dbt wrapper script
       run: |
         cat << 'EOF' > dbt_wrapper.sh
         #!/bin/bash
+        set -eo pipefail
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
-        cd /ghw/dev-${{ matrix.os_name }}
+        cd dev-${{ matrix.os_name }}
         source env.sh
-        if [[ -d ".sourcecode/dbe" ]]; then
+        if [[ -d "sourcecode/dbe" ]]; then
           spack load dbe
         fi
         exec "$@"
@@ -183,26 +192,18 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        BRANCH="$CALLER_BRANCH"
-
         cat << EOF > setup_build_area.sh
         #!/bin/bash
-
         set -eo pipefail
-
         source /cvmfs/dunedaq.opensciencegrid.org/setup_dunedaq.sh
         setup_dbt latest
 
-        # Need the -s flag to avoid permission issues with /.spack when running
-        # inside a container as a non-root user
-        dbt-create -s ${{ steps.get_release_info.outputs.extra_dbt_args }} \
-                   ${{ steps.get_release_info.outputs.release_name}} \
+        dbt-create ${{ env.DBT_ARGS }} \
+                   ${{ env.RELEASE_NAME }} \
                    dev-${{ matrix.os_name }} || exit 11
         cd dev-${{ matrix.os_name }}
         source env.sh
-
         cd sourcecode
-
         if [[ "$CALLER_BRANCH" == "$TARGET_BRANCH" ]]; then
           cp -pr /ghw/$REPO .
         else   # Someone opened a PR
@@ -223,11 +224,10 @@ jobs:
         cat setup_build_area.sh
 
         docker run --rm \
-          --user $(id -u):$(id -g) \
           -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
           -w /ghw \
-          ${{ needs.determine_image.outputs.image }} \
+          $IMAGE \
           /ghw/setup_build_area.sh
 
     - name: upload build log file
@@ -238,22 +238,18 @@ jobs:
 
     - name: Run unit tests
       run: |
-        # The USER environment variable needs to be set for
-        # hdf5libs unit tests to pass
         docker run --rm \
-          --user $(id -u):$(id -g) \
+          -e USER=$(whoami) \
           -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
-          -e USER=dunedaq \
           -w /ghw \
-          ${{ needs.determine_image.outputs.image }} \
-          /ghw/dbt_wrapper.sh dbt-build --unittest $REPO
+          $IMAGE \
+          /ghw/dbt_wrapper.sh dbt-build --unittest
 
     - name: Get unit test summary path
       id: unit_test_summary
       run: |
         summary_file_path=$(find . -name unit_test_summary.log -type f)
-        ./daq-release/scripts/github-ci/parse_unit_test_summary.sh $summary_file_path | tee $GITHUB_STEP_SUMMARY
         echo "summary_file_path=$summary_file_path" >> "$GITHUB_OUTPUT"
 
     - name: upload unit test summary file
@@ -263,14 +259,36 @@ jobs:
         name: unit_test_summary
         path: ${{ steps.unit_test_summary.outputs.summary_file_path }}
 
-    - name: Run linting
+    - name: Run clang formatting
       run: |
         docker run --rm \
-          --user $(id -u):$(id -g) \
           -v /cvmfs:/cvmfs:shared \
           -v "${GITHUB_WORKSPACE}:/ghw" \
           -w /ghw \
-          ${{ needs.determine_image.outputs.image }} \
+          $IMAGE \
+          /ghw/dbt_wrapper.sh dbt-clang-format.sh sourcecode/$REPO --view-differences-only --markdown-summary
+
+    - name: Get clang format summary path
+      id: clang_format_summary
+      run: |
+        file_path=$(find . -name clang_format_summary_table.md -type f)
+        echo "file_path=$file_path" >> "$GITHUB_OUTPUT"
+        cat "$GITHUB_OUTPUT"
+  
+    - name: upload clang format summary file
+      uses: actions/upload-artifact@v7
+      with:
+        if-no-files-found: error
+        name: clang_format_summary
+        path: ${{ steps.clang_format_summary.outputs.file_path }}
+
+    - name: Run linting
+      run: |
+        docker run --rm \
+          -v /cvmfs:/cvmfs:shared \
+          -v "${GITHUB_WORKSPACE}:/ghw" \
+          -w /ghw \
+          $IMAGE \
           /ghw/dbt_wrapper.sh dbt-build --lint $REPO
 
     - name: set linting artifact name
@@ -283,8 +301,7 @@ jobs:
 
         linting_file_path=$(find ${{ github.workspace }}/dev-${{ matrix.os_name }}/log/ -name ${REPO}_linting.log | tail -n 1)
         if [[ ! -f "$linting_file_path" ]]; then
-          echo "No file named ${REPO}_linting.log found"
-          exit 15
+          echo "::warning::No file named ${REPO}_linting.log found"
         fi
 
         echo "linting_artifact_name=$linting_artifact_name" >> "$GITHUB_OUTPUT"
@@ -298,39 +315,82 @@ jobs:
         name: ${{ steps.set_artifact_name.outputs.linting_artifact_name }}
         path: ${{ steps.set_artifact_name.outputs.linting_file_path }}
 
-    - name: Run clang formatting
-      id: clang_format
-      run: |
-        docker run --rm \
-          -v /cvmfs:/cvmfs:shared \
-          -v "${GITHUB_WORKSPACE}:/ghw" \
-          -e USER=dunedaq \
-          -w /ghw \
-          ${{ needs.determine_image.outputs.image }} \
-          /ghw/dbt_wrapper.sh \
-          dbt-clang-format.sh sourcecode/$REPO --view-differences-only --markdown-summary
 
-    - name: Get unit test summary path
-      id: clang_format_summary
-      run: |
-        file_path=$(find . -name clang_format_summary_table.md -type f)
-        cat "$file_path" >> $GITHUB_STEP_SUMMARY
-        echo "file_path=$file_path" >> "$GITHUB_OUTPUT"
-        cat "$GITHUB_OUTPUT"
-  
-    - name: upload clang format summary file
-      uses: actions/upload-artifact@v7
+  report_unit_tests_results:
+    needs: [setup, build_and_run_tests]
+    name: Unit tests
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        include:
+          - os_name: "a9"
+    steps:
+    - name: Download unit test report
+      uses: actions/download-artifact@v8
       with:
-        if-no-files-found: error
-        name: clang_format_summary
-        path: ${{ steps.clang_format_summary.outputs.file_path }}
+        name: unit_test_summary
 
-  compare_linting_results:
+    - name: Checkout daq-release
+      uses: actions/checkout@v7
+      with:
+        repository: DUNE-DAQ/daq-release
+        path: daq-release
+
+    - name: Report unit test results
+      id: unit_test_summary
+      run: |
+        summary_file_path=$(find . -name unit_test_summary.log -type f)
+        ./daq-release/scripts/github-ci/parse_unit_test_summary.sh $summary_file_path | tee $GITHUB_STEP_SUMMARY
+        if grep -q "FAILURE" "$summary_file_path"; then
+          echo "::error::One or more unit tests failed"
+          exit 1
+        fi
+        echo "All unit tests passed"
+
+
+  report_clang_formatting_results:
+    needs: [setup, build_and_run_tests]
+    name: Clang formatting
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      matrix:
+        include:
+          - os_name: "a9"
+
+    steps:
+    - name: Download clang formatting report
+      uses: actions/download-artifact@v8
+      with:
+        name: clang_format_summary
+
+    - name: Check clang formatting report
+      run: |
+        clang_summary_file="clang_format_summary_table.md"
+        if [[ ! -f "$clang_summary_file" ]]; then
+          echo "::error::No file named $clang_summary_file found"
+          exit 1
+        fi
+        cat "$clang_summary_file" >> $GITHUB_STEP_SUMMARY
+
+        if grep -q "Needs formatting" "$clang_summary_file"; then
+          echo "One or more files need clang formatting"
+          exit 1
+        fi
+
+
+  report_linting_results:
     if: ${{ inputs.caller_event_name == 'pull_request' }}
-    needs: [Should_run, Build_against_dev_release]
+    name: Linting diff
+    needs: [setup, build_and_run_tests]
     runs-on: ubuntu-latest
     env:
-      REPO: ${{ needs.Should_run.outputs.repo_name }}
+      REPO: ${{ needs.setup.outputs.repo_name }}
     defaults:
       run:
         shell: bash
@@ -388,11 +448,11 @@ jobs:
         nightly_linting_results_file=$(find nightly_linting/ -name "${REPO}_linting.log" | tail -n 1)
 
         if [[ ! -f "$pr_linting_results_file" ]]; then
-          echo "ERROR: No PR linting results file found"
+          echo "::error::No PR linting results file found"
           exit 11
         fi
         if [[ ! -f "$nightly_linting_results_file" ]]; then
-          echo "ERROR: No nightly linting results file found"
+          echo "::error::No nightly linting results file found"
           exit 12
         fi
 
@@ -409,7 +469,7 @@ jobs:
 
         diff_exists=""
         if [[ -s "$diff_file_name" ]]; then
-          echo "ERROR: This PR introduces new linting errors:"
+          echo "::error::This PR introduces new linting errors:"
           cat "$diff_file_name"
           echo "diff_exists=true" >> "$GITHUB_OUTPUT"
           echo "diff_file_name=$diff_file_name" >> "$GITHUB_OUTPUT"
@@ -425,13 +485,19 @@ jobs:
         name: linting_diff
         path: ${{ steps.compare.outputs.diff_file_name }}
 
+
   check_docs_links:
     runs-on: ubuntu-latest
+    name: Check docs links
     defaults:
       run:
         shell: bash
     steps:
     - uses: actions/checkout@v7
+      with:
+        repository: ${{ inputs.repository }}
+        ref:        ${{ env.CALLER_BRANCH }}
+
     - name: Check links
       uses: lycheeverse/lychee-action@649b0e4890508ea3e11ea6b3ee35ce899a25afd5
       env:
@@ -455,4 +521,15 @@ jobs:
       with:
         name: link_checker_log
         path: ./lychee/out.md
+
+    - name: Raise links errors
+      run: |
+        num_errors=$(awk -F'|' '/Errors/ {gsub(/ /, "", $3); print $3}' lychee/out.md)
+        num_unknown=$(awk -F'|' '/Unknown/ {gsub(/ /, "", $3); print $3}' lychee/out.md)
+
+        if (( ${num_errors:-0} > 0 || ${num_unknown:-0} > 0 )); then
+          echo "::error::Found $num_errors broken and $num_unknown unknown links. See this run's summary page:"
+          echo "::error::${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          exit 1
+        fi
 
