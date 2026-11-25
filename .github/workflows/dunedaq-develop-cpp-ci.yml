@@ -250,7 +250,6 @@ jobs:
       id: unit_test_summary
       run: |
         summary_file_path=$(find . -name unit_test_summary.log -type f)
-        ./daq-release/scripts/github-ci/parse_unit_test_summary.sh $summary_file_path | tee $GITHUB_STEP_SUMMARY
         echo "summary_file_path=$summary_file_path" >> "$GITHUB_OUTPUT"
 
     - name: upload unit test summary file
